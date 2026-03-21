@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(ls \"C:/Program Files \\(x86\\)/CODESYS 3.5.17.30/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/CODESYS/\")",
+      "Bash(find \"C:/Program Files \\(x86\\)/CODESYS 3.5.17.30/CODESYS\" -name \"CODESYS.exe\")",
+      "Bash(find \"C:/Program Files \\(x86\\)/CODESYS 3.5.17.30\" -name \"*.profile\" -o -name \"Profiles\" -type d)",
+      "Bash(cat \"C:/Program Files \\(x86\\)/CODESYS 3.5.17.30/CODESYS/Common/CODESYS.exe.config\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/CODESYS 3.5.17.30/CODESYS/Profiles/\")",
+      "Bash(npm install:*)",
+      "Bash(codesys-mcp-tool --version)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(claude mcp:*)",
+      "Bash(node \"C:/Users/Mike/fix_mcp.js\")",
+      "mcp__codesys_local__create_pou",
+      "mcp__codesys_local__open_project",
+      "mcp__codesys_local__set_pou_code",
+      "WebSearch",
+      "WebFetch(domain:forge.codesys.com)",
+      "WebFetch(domain:content.helpme-codesys.com)",
+      "WebFetch(domain:forum.codesys.com)",
+      "WebFetch(domain:www.shaswatraj.com)"
+    ]
+  }
+}

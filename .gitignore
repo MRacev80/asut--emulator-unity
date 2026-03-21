@@ -1,0 +1,23 @@
+# CODESYS
+codesys-mcp-server.js
+*.bak
+
+# Unity
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/obj/
+unity/Build/
+unity/Builds/
+unity/.vs/
+unity/**/*.csproj
+unity/**/*.sln
+unity/**/*.user
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Obsidian
+.obsidian/
