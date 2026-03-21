@@ -7,30 +7,11 @@
 
 ## В работе
 
-- [ ] **T-MCP-03** Протестировать компиляцию + чтение ошибок
+- [ ] **T-MCP-07** Реализовать `monitor_variable` — чтение/запись переменных онлайн
 
 ---
 
 ## Бэклог — Итерация 0 (Инфраструктура MCP)
-
-- [ ] **T-MCP-03** Протестировать компиляцию + чтение ошибок
-  - `compile_project` → `get_compile_messages(filter=error)`
-  - Ожидание: список ошибок возвращается в чат
-
-- [ ] **T-MCP-04** Протестировать `manage_library`
-  - `manage_library(action=list)` — посмотреть что в проекте
-  - `manage_library(action=add, libraryName=IoStandard)` — добавить библиотеку
-  - Ожидание: IoStandard добавляется, ошибки компиляции уходят
-
-- [ ] **T-MCP-05** Протестировать `download_to_plc`
-  - Эмулятор должен быть запущен (CODESYS Control Win V3)
-  - `download_to_plc(simulationMode=true, startAfterDownload=true)`
-  - Ожидание: приложение загружено и запущено в эмуляторе
-
-- [ ] **T-MCP-06** Протестировать чтение логов
-  - `get_codesys_log(logType=runtime, lines=20)`
-  - `get_codesys_log(logType=plc, lines=20)`
-  - Ожидание: последние строки логов возвращаются в чат
 
 - [ ] **T-MCP-07** Реализовать `monitor_variable` — чтение/запись переменных онлайн
   - Чтение значений переменных из запущенного приложения
@@ -65,7 +46,10 @@
 ## Готово
 
 - [x] **T-001** Установить codesys-mcp-toolkit, подключить к Claude Code
-- [x] **T-001a** Расширить MCP: `manage_library`, `get_project_variables`, `get_compile_messages`, `get_codesys_log`, `download_to_plc`
-- [x] **T-001b** Тестовый проект TestPLC: `FB_Counter` + `PLC_PRG`
+- [x] **T-001a** Расширить MCP: `manage_library`, `get_codesys_log`, `download_to_plc`
+  - `get_compile_messages` — не нужен: ошибки компилятора видны в выводе `download_to_plc`
+  - `get_project_variables` — SP17 не поддерживает, отложено
+- [x] **T-001b** Тестовый проект TestPLC: `FB_Counter` + `PLC_PRG`, загружен в эмулятор (State=run)
+- [x] **T-MCP-03..06** Тесты пройдены: compile, manage_library, download_to_plc, get_codesys_log
 - [x] **T-002** Git-репозиторий, структура папок `/specs /unity /docs /codesys`
 - [x] **T-003** Шаблон spec.md

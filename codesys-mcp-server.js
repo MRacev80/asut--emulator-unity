@@ -1814,6 +1814,111 @@ except Exception as e:
                 return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
             }
         }));
+        // --- monitor_variable tool ---
+        const MONITOR_VARIABLE_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback, time
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+ACTION        = "{ACTION}"
+VARIABLE_PATH = "{VARIABLE_PATH}"
+WRITE_VALUE   = "{WRITE_VALUE}"
+try:
+    print("DEBUG: monitor_variable action=%s var=%s" % (ACTION, VARIABLE_PATH))
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+
+    # Find application
+    target_app = primary_project.active_application
+    if not target_app:
+        for child in primary_project.get_children(True):
+            if hasattr(child, 'is_application') and child.is_application:
+                target_app = child
+                break
+    if not target_app:
+        raise RuntimeError("No application found in project")
+
+    # Connect online (read-only login - no download)
+    online_app = script_engine.online.create_online_application(target_app)
+    try:
+        online_app.login(script_engine.OnlineChangeOption.Never, False)
+        print("DEBUG: Online login OK")
+        time.sleep(0.5)
+
+        if ACTION == "read":
+            var = online_app.create_variable(VARIABLE_PATH)
+            online_app.read_variables([var])
+            value = var.value
+            print("SCRIPT_SUCCESS: %s = %s" % (VARIABLE_PATH, value))
+
+        elif ACTION == "write":
+            var = online_app.create_variable(VARIABLE_PATH)
+            # Try to convert write value to appropriate type
+            write_val = WRITE_VALUE
+            try:
+                if write_val.upper() == "TRUE":
+                    write_val = True
+                elif write_val.upper() == "FALSE":
+                    write_val = False
+                elif "." in write_val:
+                    write_val = float(write_val)
+                else:
+                    write_val = int(write_val)
+            except:
+                pass  # keep as string
+            var.value = write_val
+            online_app.write_variables([var])
+            # Read back to confirm
+            online_app.read_variables([var])
+            print("SCRIPT_SUCCESS: %s written = %s, readback = %s" % (VARIABLE_PATH, WRITE_VALUE, var.value))
+
+        elif ACTION == "read_all":
+            # Read a list of common variables from PLC_PRG
+            paths = VARIABLE_PATH.split(";")
+            vars_list = [online_app.create_variable(p.strip()) for p in paths if p.strip()]
+            online_app.read_variables(vars_list)
+            lines = ["%s = %s" % (v.path, v.value) for v in vars_list]
+            print("SCRIPT_SUCCESS:\\n" + "\\n".join(lines))
+
+        else:
+            raise RuntimeError("Unknown action: %s. Use read/write/read_all" % ACTION)
+
+    finally:
+        try:
+            online_app.logout()
+            print("DEBUG: Logged out")
+        except:
+            pass
+
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("monitor_variable",
+        "Read or write variables from a running CODESYS application (online). App must be running (use download_to_plc first). Actions: read, write, read_all (semicolon-separated paths).",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            action: zod_1.z.enum(["read", "write", "read_all"]).describe("read — get value, write — set value, read_all — read multiple vars (semicolon-separated paths)"),
+            variablePath: zod_1.z.string().describe("Variable path, e.g. '.Application.PLC_PRG.fbSchyotchik.nCount'. For read_all — semicolon-separated list."),
+            value: zod_1.z.string().optional().describe("Value to write (for action=write). Supports: TRUE/FALSE, integers, floats.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, action, variablePath, value = "" } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: monitor_variable action=${action} var=${variablePath}`);
+            try {
+                const escapedPath = absPath.replace(/\\/g, '\\\\');
+                const script = MONITOR_VARIABLE_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", escapedPath)
+                    .replace("{ACTION}", action)
+                    .replace("{VARIABLE_PATH}", variablePath)
+                    .replace("{WRITE_VALUE}", value);
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
         // --- End Tools ---
         console.error("SERVER.TS: Resources and Tools defined.");
         // --- End MCP Resources / Tools Definitions ---
