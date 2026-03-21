@@ -1579,30 +1579,66 @@ except Exception as e:
 import sys, scriptengine as script_engine, os, traceback
 ${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
 FILTER = "{FILTER}"
+def format_msg(msg):
+    sev  = str(getattr(msg, 'severity',    '')).lower()
+    desc = str(getattr(msg, 'description', str(msg)))
+    obj  = str(getattr(msg, 'object_name', ''))
+    pos  = str(getattr(msg, 'position',    ''))
+    line = "[%s] %s" % (sev.upper() if sev else "?", desc)
+    if obj: line += " | obj: %s" % obj
+    if pos: line += " | pos: %s" % pos
+    return sev, line
 try:
     print("DEBUG: get_compile_messages: project=%s filter=%s" % (PROJECT_FILE_PATH, FILTER))
     primary_project = ensure_project_open(PROJECT_FILE_PATH)
     results = []
-    try:
-        msg_center = script_engine.message_center
-        messages = msg_center.get_all_messages()
+    msg_center = None
+    # Try different API variants (SP17 vs SP21+)
+    for attr in ['messagecenter', 'message_center', 'MessageCenter']:
+        try:
+            msg_center = getattr(script_engine, attr)
+            print("DEBUG: found message center via script_engine.%s" % attr)
+            break
+        except AttributeError:
+            pass
+    if msg_center is None:
+        try:
+            msg_center = primary_project.get_message_center()
+            print("DEBUG: found message center via project.get_message_center()")
+        except Exception:
+            pass
+    if msg_center is not None:
+        try:
+            messages = msg_center.get_all_messages()
+        except Exception:
+            messages = list(msg_center)
         for msg in messages:
             try:
-                sev = str(getattr(msg, 'severity', '')).lower()
-                desc = str(getattr(msg, 'description', str(msg)))
-                obj  = str(getattr(msg, 'object_name', ''))
-                pos  = str(getattr(msg, 'position', ''))
-                line = "[%s] %s" % (sev.upper(), desc)
-                if obj:  line += " | object: %s" % obj
-                if pos:  line += " | pos: %s" % pos
+                sev, line = format_msg(msg)
                 if FILTER == "all" or FILTER in sev:
                     results.append(line)
             except Exception as me:
                 results.append("[?] %s" % str(msg))
-    except Exception as mc_err:
-        results.append("WARN: message_center not available: %s" % mc_err)
-        results.append("TIP: Run compile_project first, then call this tool.")
-    output = "\\n".join(results) if results else "No messages found (filter=%s)" % FILTER
+    else:
+        # Fallback: read from CODESYS log file
+        log_path = r"C:\\ProgramData\\CODESYS\\CODESYSControlWinV3\\FA001425\\CODESYS Control Win V3.log"
+        results.append("WARN: message_center API not available in this CODESYS version.")
+        results.append("Fallback: reading runtime log...")
+        try:
+            with open(log_path, 'r') as f:
+                lines = f.readlines()
+            for l in lines[-30:]:
+                l = l.strip()
+                if not l: continue
+                if FILTER == "all":
+                    results.append(l)
+                elif FILTER == "error"   and ("error" in l.lower() or "fault" in l.lower()):
+                    results.append(l)
+                elif FILTER == "warning" and "warn" in l.lower():
+                    results.append(l)
+        except Exception as log_err:
+            results.append("Could not read log: %s" % log_err)
+    output = "\\n".join(results) if results else "No messages (filter=%s)" % FILTER
     print("SCRIPT_SUCCESS: " + output)
     sys.exit(0)
 except Exception as e:
@@ -1637,7 +1673,7 @@ except Exception as e:
         "Reads CODESYS runtime log files from disk (Control Win V3 service log and PLC log). Useful for runtime errors.",
         {
             logType: zod_1.z.enum(["runtime", "plc", "all"]).default("all").describe("Which log to read: runtime (service log), plc (PlcLog.csv), all"),
-            lines: zod_1.z.number().default(50).describe("Number of last lines to return (default 50)")
+            lines: zod_1.z.coerce.number().default(50).describe("Number of last lines to return (default 50)")
         }, (args) => __awaiter(this, void 0, void 0, function* () {
             const { logType = "all", lines = 50 } = args;
             console.error(`Tool call: get_codesys_log type=${logType} lines=${lines}`);
@@ -1757,8 +1793,8 @@ except Exception as e:
         "Builds and downloads CODESYS application to PLC or emulator. Optionally starts the application after download.",
         {
             projectFilePath: zod_1.z.string().describe("Path to the .project file."),
-            simulationMode: zod_1.z.boolean().default(true).describe("Enable simulation/emulation mode (default: true). Set false for real PLC."),
-            startAfterDownload: zod_1.z.boolean().default(true).describe("Start the application after download (default: true).")
+            simulationMode: zod_1.z.coerce.boolean().default(true).describe("Enable simulation/emulation mode (default: true). Set false for real PLC."),
+            startAfterDownload: zod_1.z.coerce.boolean().default(true).describe("Start the application after download (default: true).")
         }, (args) => __awaiter(this, void 0, void 0, function* () {
             const { projectFilePath, simulationMode = true, startAfterDownload = true } = args;
             const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));

@@ -21,7 +21,13 @@
       "WebFetch(domain:forge.codesys.com)",
       "WebFetch(domain:content.helpme-codesys.com)",
       "WebFetch(domain:forum.codesys.com)",
-      "WebFetch(domain:www.shaswatraj.com)"
+      "WebFetch(domain:www.shaswatraj.com)",
+      "mcp__codesys_local__download_to_plc",
+      "Bash(node -e \"const d=require\\(''C:/Users/Mike/.claude.json''\\); console.log\\(JSON.stringify\\(d.mcpServers, null, 2\\)\\)\")",
+      "mcp__codesys_local__compile_project",
+      "mcp__codesys_local__manage_library",
+      "mcp__codesys_local__get_codesys_log",
+      "mcp__codesys_local__get_project_variables"
     ]
   }
 }
