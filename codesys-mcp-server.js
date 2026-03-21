@@ -1865,23 +1865,24 @@ try:
                 raise RuntimeError("No variable read API found. OnlineApp attrs: %s" % attrs)
 
         def write_var(path, raw_val):
-            write_val = raw_val
-            try:
-                if str(raw_val).upper() == "TRUE":  write_val = True
-                elif str(raw_val).upper() == "FALSE": write_val = False
-                elif "." in str(raw_val):             write_val = float(raw_val)
-                else:                                  write_val = int(raw_val)
-            except: pass
             if has_create_variable:
+                # SP21+: convert to Python types for create_variable API
+                write_val = raw_val
+                try:
+                    if str(raw_val).upper() == "TRUE":  write_val = True
+                    elif str(raw_val).upper() == "FALSE": write_val = False
+                    elif "." in str(raw_val):             write_val = float(raw_val)
+                    else:                                  write_val = int(raw_val)
+                except: pass
                 v = online_app.create_variable(path)
                 v.value = write_val
                 online_app.write_variables([v])
                 online_app.read_variables([v])
                 return v.value
             else:
-                # SP17: set_prepared_value + write_prepared_values
+                # SP17: set_prepared_value expects STRING, not Python bool/int
                 try:
-                    online_app.set_prepared_value(path, write_val)
+                    online_app.set_prepared_value(path, str(raw_val))
                     try:
                         online_app.write_prepared_values()
                     except Exception:
