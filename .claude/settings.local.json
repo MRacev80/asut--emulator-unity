@@ -27,7 +27,8 @@
       "mcp__codesys_local__compile_project",
       "mcp__codesys_local__manage_library",
       "mcp__codesys_local__get_codesys_log",
-      "mcp__codesys_local__get_project_variables"
+      "mcp__codesys_local__get_project_variables",
+      "mcp__codesys_local__monitor_variable"
     ]
   }
 }

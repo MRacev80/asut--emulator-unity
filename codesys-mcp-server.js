@@ -1842,39 +1842,72 @@ try:
         print("DEBUG: Online login OK")
         time.sleep(0.5)
 
+        # Detect available variable API (SP17 vs SP21+)
+        has_create_variable = hasattr(online_app, 'create_variable')
+        has_read_value      = hasattr(online_app, 'read_value')
+        has_prepare_value   = hasattr(online_app, 'prepare_value')
+        print("DEBUG: API: create_variable=%s read_value=%s prepare_value=%s" % (
+            has_create_variable, has_read_value, has_prepare_value))
+
+        def read_var(path):
+            if has_create_variable:
+                v = online_app.create_variable(path)
+                online_app.read_variables([v])
+                return v.value
+            elif has_read_value:
+                return online_app.read_value(path)
+            elif has_prepare_value:
+                online_app.prepare_value(path, None)
+                return online_app.read_value(path)
+            else:
+                # SP17 fallback: list all available attrs for diagnostics
+                attrs = [a for a in dir(online_app) if not a.startswith('_')]
+                raise RuntimeError("No variable read API found. OnlineApp attrs: %s" % attrs)
+
+        def write_var(path, raw_val):
+            write_val = raw_val
+            try:
+                if str(raw_val).upper() == "TRUE":  write_val = True
+                elif str(raw_val).upper() == "FALSE": write_val = False
+                elif "." in str(raw_val):             write_val = float(raw_val)
+                else:                                  write_val = int(raw_val)
+            except: pass
+            if has_create_variable:
+                v = online_app.create_variable(path)
+                v.value = write_val
+                online_app.write_variables([v])
+                online_app.read_variables([v])
+                return v.value
+            else:
+                # SP17: set_prepared_value + write_prepared_values
+                try:
+                    online_app.set_prepared_value(path, write_val)
+                    try:
+                        online_app.write_prepared_values()
+                    except Exception:
+                        online_app.force_prepared_values()
+                    time.sleep(0.2)
+                    return online_app.read_value(path)
+                except Exception as write_err:
+                    attrs = [a for a in dir(online_app) if not a.startswith('_')]
+                    raise RuntimeError("Write failed: %s\\nOnlineApp attrs: %s" % (write_err, attrs))
+
         if ACTION == "read":
-            var = online_app.create_variable(VARIABLE_PATH)
-            online_app.read_variables([var])
-            value = var.value
+            value = read_var(VARIABLE_PATH)
             print("SCRIPT_SUCCESS: %s = %s" % (VARIABLE_PATH, value))
 
         elif ACTION == "write":
-            var = online_app.create_variable(VARIABLE_PATH)
-            # Try to convert write value to appropriate type
-            write_val = WRITE_VALUE
-            try:
-                if write_val.upper() == "TRUE":
-                    write_val = True
-                elif write_val.upper() == "FALSE":
-                    write_val = False
-                elif "." in write_val:
-                    write_val = float(write_val)
-                else:
-                    write_val = int(write_val)
-            except:
-                pass  # keep as string
-            var.value = write_val
-            online_app.write_variables([var])
-            # Read back to confirm
-            online_app.read_variables([var])
-            print("SCRIPT_SUCCESS: %s written = %s, readback = %s" % (VARIABLE_PATH, WRITE_VALUE, var.value))
+            readback = write_var(VARIABLE_PATH, WRITE_VALUE)
+            print("SCRIPT_SUCCESS: %s written=%s readback=%s" % (VARIABLE_PATH, WRITE_VALUE, readback))
 
         elif ACTION == "read_all":
-            # Read a list of common variables from PLC_PRG
-            paths = VARIABLE_PATH.split(";")
-            vars_list = [online_app.create_variable(p.strip()) for p in paths if p.strip()]
-            online_app.read_variables(vars_list)
-            lines = ["%s = %s" % (v.path, v.value) for v in vars_list]
+            paths = [p.strip() for p in VARIABLE_PATH.split(";") if p.strip()]
+            lines = []
+            for p in paths:
+                try:
+                    lines.append("%s = %s" % (p, read_var(p)))
+                except Exception as re:
+                    lines.append("%s = ERROR: %s" % (p, re))
             print("SCRIPT_SUCCESS:\\n" + "\\n".join(lines))
 
         else:
