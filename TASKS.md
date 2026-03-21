@@ -15,32 +15,56 @@
 
 ---
 
+### T-PY-02 — Включить OPC UA Server, опубликовать теги TestPLC
+
+**Что:** добавить Symbol Configuration в TestPLC.project; опубликовать `fbSchyotchik`, `bSbros`, `nPorog`; скомпилировать и загрузить в эмулятор; проверить через UaExpert
+**Готово когда:** UaExpert подключается к `opc.tcp://localhost:4840` и показывает минимум 3 тега с живыми значениями
+**Зачем:** без тегов в OPC UA Python Bridge не имеет источника данных
+
+---
+
 ## Бэклог — Итерация 2 (Python Bridge)
 
 > Архитектура: CODESYS OPC UA Server → Python asyncua → WebSocket → Unity
 > MasterSCADA 4 подключается напрямую к CODESYS OPC UA
 
-### T-PY-01 — Проверить лицензию OPC UA в CODESYS Control Win V3
+### T-PY-03a — tags.yaml: описать теги TestPLC
 
-**Что:** открыть CODESYS → Tools → License Manager, найти `SL_OPCUAServer`
-**Готово когда:** в разделе «Открытые вопросы» ПРОЕКТ.md зафиксировано: есть / нет + следующий шаг (демо-лицензия или альтернатива)
-**Зачем:** без лицензии OPC UA Server вся Итерация 2 заблокирована
-
----
-
-### T-PY-02 — Включить OPC UA Server, опубликовать теги TestPLC
-
-**Что:** добавить Symbol Configuration в TestPLC.project; включить публикацию `bStart`, `nCount`, `nThreshold`; проверить через UaExpert
-**Готово когда:** UaExpert показывает минимум 3 тега с корректными значениями в реальном времени
-**Зачем:** без тегов в OPC UA Python Bridge и MasterSCADA не имеют источника данных
+**Что:** создать `/python-bridge/tags.yaml` — 5 тегов TestPLC: `tag_id`, `node_id` (из UaExpert), `data_type`, `writable`, `unit`, `mock_mode`
+**Готово когда:** YAML валиден; `node_id` скопированы из UaExpert и соответствуют реальным тегам
+**Зачем:** TagRegistry читает tags.yaml — инженер добавляет теги без правки кода Bridge
 
 ---
 
-### T-PY-03 — Python Bridge: базовый скелет
+### T-PY-03b — Python Bridge: OpcUaSource + MockPlcSource
 
-**Что:** создать `/python-bridge/` — `main.py`, `opc_client.py` (asyncua подписка), `ws_server.py` (WebSocket broadcast); запустить, убедиться что теги появляются в консоли
-**Готово когда:** `python main.py` выводит изменения тегов TestPLC без ошибок; WebSocket сервер принимает подключения на `ws://localhost:8765`
-**Зачем:** скелет — основа Итерации 2; без него T-PY-04..07 невозможны
+**Что:** реализовать `bridge/source/opcua_source.py` (asyncua subscription + reconnect) и `bridge/source/mock_source.py` (sine/step генераторы); запустить, убедиться что теги появляются в консоли
+**Готово когда:** `python -m bridge --mode opcua` выводит TagEvent в консоль при изменении тегов; `--mode mock` выводит синтетические данные без CODESYS
+**Зачем:** два режима источника данных — основа всей системы
+
+---
+
+### T-PY-03c — Python Bridge: WsServer + протокол
+
+**Что:** реализовать `bridge/ws/server.py` (batch 50ms, multi-client) и `bridge/ws/protocol.py` (Pydantic модели: `TagUpdateMsg`, `WriteTagMsg`, `WriteAckMsg`, `PlcStatusMsg`)
+**Готово когда:** `wscat -c ws://localhost:8765` получает `initial_snapshot` и поток `tag_update` сообщений в JSON
+**Зачем:** Unity подключается по этому протоколу — нужен стабильный контракт до начала Unity-разработки
+
+---
+
+### T-PY-03d — Python Bridge: WriteDispatcher + whitelist
+
+**Что:** реализовать `bridge/ws/dispatcher.py` — принимает `write_tag` от Unity, проверяет `writable` в TagRegistry, пишет через `PlcSource.write`, возвращает `write_ack`
+**Готово когда:** `wscat` отправляет `{"type":"write_tag","request_id":"r1","tag_id":"counter.reset","value":true}` → получает `write_ack` со `status: "ok"`; попытка записать read-only тег → `status: "denied"`
+**Зачем:** безопасная двусторонняя связь — без whitelist можно случайно записать не тот тег
+
+---
+
+### T-PY-04 — Unity: WebSocket клиент вместо NModbus
+
+**Что:** добавить NativeWebSocket в Unity проект; заменить NModbus на WebSocket в `PLCBridge.cs`; разобрать JSON и обновить переменные сцены
+**Готово когда:** Unity-сцена отображает `nCount` из TestPLC в реальном времени (обновление < 500 мс) без открытого CODESYS UI
+**Зачем:** Unity получает данные через Python Bridge — основа демо и FAT-стенда
 
 ---
 
@@ -176,3 +200,5 @@
 - [x] **T-MCP-03..06** Тесты: compile, manage_library, download_to_plc, get_codesys_log — OK
 - [x] **T-002** Git-репозиторий, структура папок `/specs /unity /docs /codesys`
 - [x] **T-003** Шаблон spec.md
+- [x] **T-PY-01** Лицензия OPC UA — подтверждена (OPC UA Symbol Publishing Editor + Data Model Editor)
+- [x] **T-ARCH-01** Архитектура Python Bridge — спроектирована агентом (ADR-001, C4 L1-L3, протокол, failure modes)
