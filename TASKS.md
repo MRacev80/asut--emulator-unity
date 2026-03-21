@@ -21,6 +21,48 @@
 
 ---
 
+## Бэклог — Итерация 2 (Python Bridge: CODESYS → Python → Unity)
+
+> Архитектура: CODESYS OPC UA Server → Python asyncua → WebSocket → Unity
+> MasterSCADA 4 подключается напрямую к CODESYS OPC UA (без Python)
+
+- [ ] **T-PY-01** Проверить лицензию OPC UA в CODESYS Control Win V3
+  - Открыть CODESYS → Device → правой кнопкой → License Info
+  - Нужен: `OPC UA Server` или `SL_OPCUAServer`
+  - Если нет — найти альтернативу (демо-лицензия, другой профиль)
+
+- [ ] **T-PY-02** Включить OPC UA Server в CODESYS, опубликовать теги
+  - Добавить `Symbol Configuration` в проект
+  - Включить публикацию переменных PLC_PRG через OPC UA
+  - Проверить подключение через UaExpert (бесплатный OPC UA браузер)
+
+- [ ] **T-PY-03** Создать Python Bridge — базовый скелет
+  - `asyncua` клиент → подписка на теги CODESYS (push, не polling)
+  - `websockets` сервер → раздаёт JSON всем Unity-клиентам
+  - Структура: `python-bridge/main.py`, `bridge/opc_client.py`, `bridge/ws_server.py`
+
+- [ ] **T-PY-04** Подключить Unity к Python Bridge
+  - Добавить `NativeWebSocket` (Unity Asset Store / GitHub, бесплатно)
+  - `PLCBridge.cs` → заменить NModbus на WebSocket клиент
+  - Разобрать JSON → обновлять переменные в Unity
+
+- [ ] **T-PY-05** Тест end-to-end: CODESYS → Python → Unity
+  - Запустить TestPLC в эмуляторе
+  - Убедиться что счётчик FB_Counter отображается в Unity в реальном времени
+  - Замерить latency (лог timestamps на каждом этапе)
+
+- [ ] **T-PY-06** Mock CODESYS в Python (тест Unity без ПЛК)
+  - `MockPlcSource` — генерирует синтетические данные
+  - Unity переключается между Mock и реальным ПЛК через флаг в конфиге
+  - Цель: тестировать Unity-сцены без запущенного CODESYS
+
+- [ ] **T-PY-07** FAT-автоматизация — базовый скрипт
+  - Python пишет значение в CODESYS через OPC UA
+  - Читает результат, проверяет условие (assert)
+  - Генерирует отчёт (JSON / MD) → Claude оформляет в документ
+
+---
+
 ## Бэклог — Итерация 0a (Проектирование)
 
 - [ ] **T-005** Шаблон `signals.md` — таблица сигналов (тег, тип, Modbus-адрес)
