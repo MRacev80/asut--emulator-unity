@@ -1667,6 +1667,117 @@ except Exception as e:
             const output = results.join('\n\n');
             return { content: [{ type: "text", text: output }], isError: false };
         }));
+        // --- download_to_plc tool ---
+        const DOWNLOAD_TO_PLC_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback, time
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+SIMULATION_MODE = {SIMULATION_MODE}
+START_AFTER_DOWNLOAD = {START_AFTER_DOWNLOAD}
+try:
+    print("DEBUG: download_to_plc: project=%s sim=%s start=%s" % (PROJECT_FILE_PATH, SIMULATION_MODE, START_AFTER_DOWNLOAD))
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+
+    # 1. Find device and set simulation mode
+    device = None
+    try:
+        all_children = primary_project.get_children(True)
+        for child in all_children:
+            if hasattr(child, 'get_simulation_mode'):
+                device = child
+                print("DEBUG: Found device: %s" % child.get_name())
+                break
+        if device:
+            device.set_simulation_mode(SIMULATION_MODE)
+            print("DEBUG: Simulation mode set to %s" % SIMULATION_MODE)
+        else:
+            print("WARN: No device found, skipping simulation mode setting")
+    except Exception as dev_err:
+        print("WARN: Could not set simulation mode: %s" % dev_err)
+
+    # 2. Find application
+    target_app = primary_project.active_application
+    if not target_app:
+        for child in primary_project.get_children(True):
+            if hasattr(child, 'is_application') and child.is_application:
+                target_app = child
+                break
+    if not target_app:
+        raise RuntimeError("No application found in project")
+    app_name = target_app.get_name()
+    print("DEBUG: Application found: %s" % app_name)
+
+    # 3. Build
+    print("DEBUG: Building application...")
+    target_app.build()
+    time.sleep(2)
+
+    # 4. Check build messages for errors
+    errors = []
+    try:
+        for msg in script_engine.system.get_message_objects():
+            sev = str(getattr(msg, 'severity', '')).lower()
+            if 'error' in sev:
+                errors.append(str(getattr(msg, 'description', str(msg))))
+    except Exception as msg_err:
+        print("WARN: Could not read messages: %s" % msg_err)
+    if errors:
+        raise RuntimeError("Build errors:\\n" + "\\n".join(errors[:10]))
+    print("DEBUG: Build OK, no errors")
+
+    # 5. Login + Download
+    print("DEBUG: Starting online login and download...")
+    online_app = script_engine.online.create_online_application(target_app)
+    try:
+        online_app.login(script_engine.OnlineChangeOption.Never, True)
+        print("DEBUG: Login/download complete")
+        time.sleep(2)
+
+        # 6. Start if requested
+        if START_AFTER_DOWNLOAD:
+            print("DEBUG: Starting application...")
+            online_app.start()
+            time.sleep(1)
+            print("DEBUG: Application started")
+
+        state = str(getattr(online_app, 'application_state', 'unknown'))
+        print("SCRIPT_SUCCESS: Download complete. App=%s State=%s Sim=%s" % (app_name, state, SIMULATION_MODE))
+        sys.exit(0)
+    finally:
+        try:
+            online_app.logout()
+            print("DEBUG: Logged out")
+        except:
+            pass
+
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("download_to_plc",
+        "Builds and downloads CODESYS application to PLC or emulator. Optionally starts the application after download.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            simulationMode: zod_1.z.boolean().default(true).describe("Enable simulation/emulation mode (default: true). Set false for real PLC."),
+            startAfterDownload: zod_1.z.boolean().default(true).describe("Start the application after download (default: true).")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, simulationMode = true, startAfterDownload = true } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: download_to_plc sim=${simulationMode} start=${startAfterDownload} path=${absPath}`);
+            try {
+                const escapedPath = absPath.replace(/\\/g, '\\\\');
+                const script = DOWNLOAD_TO_PLC_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", escapedPath)
+                    .replace("{SIMULATION_MODE}", simulationMode ? "True" : "False")
+                    .replace("{START_AFTER_DOWNLOAD}", startAfterDownload ? "True" : "False");
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
         // --- End Tools ---
         console.error("SERVER.TS: Resources and Tools defined.");
         // --- End MCP Resources / Tools Definitions ---
