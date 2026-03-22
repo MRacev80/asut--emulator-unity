@@ -1,0 +1,38 @@
+# TestPLC — OPC UA tags
+# node_id format: ns=4;s=|var|CODESYS Control Win V3.Application.<path>
+
+tags:
+  - tag_id: counter.count
+    node_id: "ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nCount"
+    data_type: INT
+    writable: false
+    unit: ""
+    description: "Schyotchik — tekushchee znachenie schyota"
+
+  - tag_id: counter.preset
+    node_id: "ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nPreset"
+    data_type: INT
+    writable: true
+    unit: ""
+    description: "Schyotchik — porog (preset)"
+
+  - tag_id: counter.done
+    node_id: "ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.bDone"
+    data_type: BOOL
+    writable: false
+    unit: ""
+    description: "Schyotchik — dostignut porog"
+
+  - tag_id: counter.reset
+    node_id: "ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.bSbros"
+    data_type: BOOL
+    writable: true
+    unit: ""
+    description: "Sbros schyotchika"
+
+  - tag_id: counter.threshold
+    node_id: "ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.nPorog"
+    data_type: INT
+    writable: true
+    unit: ""
+    description: "Porog PLC_PRG"
