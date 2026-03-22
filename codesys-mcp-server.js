@@ -1793,7 +1793,7 @@ except Exception as e:
         "Builds and downloads CODESYS application to PLC or emulator. Optionally starts the application after download.",
         {
             projectFilePath: zod_1.z.string().describe("Path to the .project file."),
-            simulationMode: zod_1.z.coerce.boolean().default(true).describe("Enable simulation/emulation mode (default: true). Set false for real PLC."),
+            simulationMode: zod_1.z.coerce.boolean().default(false).describe("Enable simulation/emulation mode (default: false = Control Win V3). Set true for built-in CODESYS IDE simulator."),
             startAfterDownload: zod_1.z.coerce.boolean().default(true).describe("Start the application after download (default: true).")
         }, (args) => __awaiter(this, void 0, void 0, function* () {
             const { projectFilePath, simulationMode = true, startAfterDownload = true } = args;

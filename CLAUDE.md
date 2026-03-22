@@ -75,7 +75,12 @@ Claude пишет код (MCP) → сохраняет файл
 Закрыть UI → снова отдать Claude для правок
 ```
 
-**Нельзя через MCP:** управление Device, Task Configuration, онлайн-мониторинг, загрузка в ПЛК, создание GVL.
+**download_to_plc — важно:**
+- `simulationMode=False` → загружает в **Control Win V3** (нужен для OPC UA)
+- `simulationMode=True` → загружает во встроенный симулятор CODESYS IDE (OPC UA не видит)
+- Всегда использовать `simulationMode=False` когда нужен OPC UA / Python Bridge / Unity
+
+**Нельзя через MCP:** управление Device, Task Configuration, онлайн-мониторинг, создание GVL.
 
 ### Расширение server.js
 

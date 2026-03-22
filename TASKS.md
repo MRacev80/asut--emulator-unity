@@ -1,99 +1,39 @@
 # TASKS — Рабочая доска
 
-> Правила: один коммит в конце каждой задачи. Формат: `[T-XXX] описание`.
+> Правила: один коммит в конце каждой задачи. Формат SMART (S, M, A, R — без даты).
 > Детали и обзор — в ПРОЕКТ.md. Обновлять оба файла синхронно.
 
 ---
 
 ## В работе
 
-### T-PY-03a — tags.yaml: описать теги TestPLC
-
-**Что:** создать `/python-bridge/tags.yaml` — теги TestPLC с реальными node_id из OPC UA
-**Готово когда:** YAML валиден; Python читает node_id и успешно читает значение через asyncua
-**Зачем:** TagRegistry читает tags.yaml — инженер добавляет теги без правки кода Bridge
-
-**Node IDs (уже известны из browse):**
-```
-bSbros:              ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.bSbros
-fbSchyotchik.nCount: ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nCount
-fbSchyotchik.nPreset:ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nPreset
-fbSchyotchik.bDone:  ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.bDone
-nPorog:              ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.nPorog
-```
+*(нет активных задач)*
 
 ---
 
 ## Бэклог — Итерация 2 (Python Bridge)
 
-> Архитектура: CODESYS OPC UA Server → Python asyncua → WebSocket → Unity
-> MasterSCADA 4 подключается напрямую к CODESYS OPC UA
+### T-PY-03a — tags.yaml: описать теги TestPLC
 
-### T-PY-03b — Python Bridge: OpcUaSource + MockPlcSource
-
----
-
-### T-PY-03b — Python Bridge: OpcUaSource + MockPlcSource
-
-**Что:** реализовать `bridge/source/opcua_source.py` (asyncua subscription + reconnect) и `bridge/source/mock_source.py` (sine/step генераторы); запустить, убедиться что теги появляются в консоли
-**Готово когда:** `python -m bridge --mode opcua` выводит TagEvent в консоль при изменении тегов; `--mode mock` выводит синтетические данные без CODESYS
-**Зачем:** два режима источника данных — основа всей системы
-
----
-
-### T-PY-03c — Python Bridge: WsServer + протокол
-
-**Что:** реализовать `bridge/ws/server.py` (batch 50ms, multi-client) и `bridge/ws/protocol.py` (Pydantic модели: `TagUpdateMsg`, `WriteTagMsg`, `WriteAckMsg`, `PlcStatusMsg`)
-**Готово когда:** `wscat -c ws://localhost:8765` получает `initial_snapshot` и поток `tag_update` сообщений в JSON
-**Зачем:** Unity подключается по этому протоколу — нужен стабильный контракт до начала Unity-разработки
-
----
-
-### T-PY-03d — Python Bridge: WriteDispatcher + whitelist
-
-**Что:** реализовать `bridge/ws/dispatcher.py` — принимает `write_tag` от Unity, проверяет `writable` в TagRegistry, пишет через `PlcSource.write`, возвращает `write_ack`
-**Готово когда:** `wscat` отправляет `{"type":"write_tag","request_id":"r1","tag_id":"counter.reset","value":true}` → получает `write_ack` со `status: "ok"`; попытка записать read-only тег → `status: "denied"`
-**Зачем:** безопасная двусторонняя связь — без whitelist можно случайно записать не тот тег
-
----
-
-### T-PY-04 — Unity: WebSocket клиент вместо NModbus
-
-**Что:** добавить NativeWebSocket в Unity проект; заменить NModbus на WebSocket в `PLCBridge.cs`; разобрать JSON и обновить переменные сцены
-**Готово когда:** Unity-сцена отображает `nCount` из TestPLC в реальном времени (обновление < 500 мс) без открытого CODESYS UI
-**Зачем:** Unity получает данные через Python Bridge — основа демо и FAT-стенда
-
----
-
-### T-PY-04 — Unity: WebSocket клиент вместо NModbus
-
-**Что:** добавить NativeWebSocket в Unity проект; заменить NModbus на WebSocket в `PLCBridge.cs`; разобрать JSON и обновить переменные сцены
-**Готово когда:** Unity-сцена отображает `nCount` из TestPLC в реальном времени (обновление < 500 мс) без открытого CODESYS UI
-**Зачем:** Unity получает данные через Python Bridge — основа демо и FAT-стенда
-
----
-
-### T-PY-05 — Тест end-to-end: CODESYS → Python → Unity
-
-**Что:** запустить полный pipeline: TestPLC в эмуляторе → Python Bridge → Unity; логировать timestamp на каждом этапе
-**Готово когда:** latency CODESYS → Unity < 100 мс подтверждена в лог-файле; счётчик FB_Counter отображается в Unity
-**Зачем:** верификация архитектуры перед разработкой первого рабочего прототипа
+**Что:** создать `/python-bridge/tags.yaml` — теги TestPLC с реальными node_id из OPC UA
+**Готово когда:** YAML валиден; Python читает node_id и успешно читает значение через asyncua
+**Зачем:** инженер добавляет теги без правки кода Bridge — только YAML
 
 ---
 
 ### T-PY-06 — Mock CODESYS в Python
 
-**Что:** создать `MockPlcSource` в `/python-bridge/mock_plc.py`; добавить флаг `USE_MOCK=true` в конфиг; убедиться что Unity не знает разницы
-**Готово когда:** Unity получает данные от mock без запущенного CODESYS; переключение mock/real — одна строка конфига
-**Зачем:** разработка и тест Unity-сцен без зависимости от CODESYS (Уровень 3 тестирования)
+**Что:** создать `MockPlcSource` — флаг `USE_MOCK=true`; синтетические данные вместо OPC UA
+**Готово когда:** Unity получает данные от mock без запущенного CODESYS; переключение — одна строка конфига
+**Зачем:** разработка Unity-сцен без зависимости от CODESYS (Уровень 3 тестирования)
 
 ---
 
-### T-PY-07 — FAT автоматизация: базовый скрипт + отчёт
+### T-PY-07 — FAT автоматизация: тесты FB_Counter
 
-**Что:** написать `conftest.py` (OPC UA фикстуры) и `test_fb_counter.py` (3 теста: пуск счётчика, сброс, достижение порога); настроить `pytest --json-report`
-**Готово когда:** `pytest tests/` выдаёт JSON-отчёт; все 3 теста проходят на TestPLC
-**Зачем:** шаблон FAT-автоматизации — основа Уровня 2 тестирования для всех будущих объектов
+**Что:** написать `conftest.py` (OPC UA фикстуры) и `test_fb_counter.py` (3 теста: пуск, сброс, порог)
+**Готово когда:** `pytest tests/` — все 3 теста проходят; JSON-отчёт сгенерирован
+**Зачем:** шаблон FAT-автоматизации — Уровень 2 тестирования для всех будущих объектов
 
 ---
 
@@ -101,102 +41,59 @@ nPorog:              ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.nPor
 
 ### T-005 — Шаблон signals.md
 
-**Что:** создать `/specs/signals_template.md` с таблицей: тег, тип, OPC UA адрес, описание, единицы, диапазон, аварийный порог; заполнить на примере TestPLC (5 тегов)
-**Готово когда:** шаблон заполнен и выглядит как рабочий документ — пригоден для передачи заказчику
-**Зачем:** стандартная таблица сигналов — основа spec.md и конфигурации OPC UA тегов
+**Что:** создать `/specs/signals_template.md`: тег, тип, OPC UA адрес, описание, единицы, диапазон, аварийный порог; заполнить на TestPLC (5 тегов)
+**Готово когда:** шаблон выглядит как рабочий документ — пригоден для передачи заказчику
+**Зачем:** стандартная таблица сигналов — основа spec.md и конфигурации OPC UA
 
 ---
 
 ### T-006 — LikeC4: архитектурная диаграмма
 
-**Что:** установить LikeC4; создать `.c4` модель текущей архитектуры (CODESYS → Python → Unity + MasterSCADA); экспортировать в PNG
+**Что:** установить LikeC4; создать `.c4` модель архитектуры (CODESYS → Python → Unity + MasterSCADA); экспортировать PNG
 **Готово когда:** PNG добавлен в `/docs/` и вставлен в ПРОЕКТ.md
 **Зачем:** наглядная схема для заказчика и новых инженеров
 
 ---
 
-### T-007 — spec.md: добавить диаграмму состояний
+### T-007 — spec.md: диаграмма состояний + аварийные ситуации
 
 **Что:** добавить в шаблон spec.md секцию `Mermaid stateDiagram` и секцию «Аварийные ситуации»
-**Готово когда:** шаблон содержит рабочий `stateDiagram` для двухсостоянного устройства (остановлен / работает)
-**Зачем:** диаграмма состояний — самая важная часть spec для корректной генерации ST через Claude
+**Готово когда:** шаблон содержит рабочий `stateDiagram` для двухсостоянного устройства
+**Зачем:** диаграмма состояний — самая важная часть spec для генерации ST через Claude
 
 ---
 
-### T-008 — Промпт ревью spec.md
-
-**Что:** написать промпт: «прочитай spec.md и задай уточняющие вопросы до написания кода»; протестировать на spec шнека
-**Готово когда:** Claude задаёт минимум 3 релевантных вопроса по spec.md шнека
-**Зачем:** предотвращает написание ST на основе неполного или противоречивого spec
-
----
+## Бэклог — Итерация 1 (Шнек дозирования Увелка)
 
 ### T-009 — Полный spec.md для шнека Увелка
 
-**Что:** написать `/specs/uvelka/FB_Shnek.md`: 7-10 тегов, логика пуска/останова, `stateDiagram`, аварийные ситуации
-**Готово когда:** spec прошёл ревью промптом T-008 без критических вопросов
+**Что:** написать `/specs/uvelka/FB_Shnek.md`: 7-10 тегов, логика пуска/останова, `stateDiagram`, аварии
+**Готово когда:** spec прошёл ревью без критических вопросов
 **Зачем:** первый реальный spec — проверка методологии на практике
 
----
-
-## Бэклог — Итерация 1 (Первый прототип: шнек дозирования Увелка)
-
 ### T-012 — Claude генерирует FB_Shnek через MCP
-
-**Что:** Claude читает `/specs/uvelka/FB_Shnek.md` → создаёт `FB_Shnek` через MCP → компилирует без ошибок
-**Готово когда:** компиляция чистая; все теги из spec присутствуют в ST-коде
-**Зачем:** первый прогон методологии spec → ST на реальном объекте
-
----
-
-### T-013 — OPC UA теги FB_Shnek в Symbol Configuration
-
-**Что:** добавить все переменные FB_Shnek в Symbol Configuration; перезапустить CODESYS
-**Готово когда:** UaExpert показывает все теги FB_Shnek с корректными типами
-**Зачем:** без тегов в OPC UA Python Bridge и MasterSCADA не видят данные шнека
-
----
-
-### T-014 — Unity сцена: П&ИД шнека
-
-**Что:** создать Unity-сцену с П&ИД: PNG фон, индикаторы состояния (работает / остановлен / авария), кнопки Пуск / Стоп
-**Готово когда:** сцена отображает статус шнека из Python Bridge в реальном времени; кнопки отправляют команды
-**Зачем:** демо для заказчика — видит реальное поведение до монтажа
-
----
-
-### T-015 — PLCBridge.cs: двусторонняя связь для шнека
-
-**Что:** расширить `PLCBridge.cs` для тегов FB_Shnek; кнопки Unity отправляют write-команды через WebSocket → Python → OPC UA
-**Готово когда:** кнопка «Пуск» в Unity запускает шнек в CODESYS; кнопка «Стоп» — останавливает
-**Зачем:** двусторонняя связь — основа интерактивного демо и FAT-стенда
-
----
-
-### T-016 — FAT-скрипт для шнека (5 тестов)
-
-**Что:** написать `test_fb_shnek.py`: пуск, нормальный останов, аварийный останов, счётчик наработки, ручной режим
-**Готово когда:** все 5 тестов проходят; pytest генерирует отчёт; Claude оформляет в MD-таблицу
-**Зачем:** верификация логики шнека до выезда на объект
-
----
-
+### T-013 — OPC UA теги FB_Shnek
+### T-014 — Unity сцена П&ИД шнека
+### T-015 — PLCBridge.cs двусторонняя связь шнека
+### T-016 — FAT-скрипт шнека (5 тестов)
 ### T-017 — Документация FB_Shnek
 
-**Что:** Claude генерирует `/docs/FB_Shnek.md` из `spec.md` + ST-кода: описание, таблица тегов с OPC UA адресами, диаграмма состояний
-**Готово когда:** документ понятен инженеру без доступа к CODESYS; теги совпадают с Symbol Configuration
-**Зачем:** передаваемая документация — заказчику и будущим инженерам
-
 ---
 
-## Готово
+## Готово ✅
 
 - [x] **T-001** Установить codesys-mcp-toolkit, подключить к Claude Code
 - [x] **T-001a** Расширить MCP: `manage_library`, `get_codesys_log`, `download_to_plc`
-- [x] **T-001b** TestPLC: `FB_Counter` + `PLC_PRG`, запущен в эмуляторе (State=run)
-- [x] **T-MCP-03..06** Тесты: compile, manage_library, download_to_plc, get_codesys_log — OK
-- [x] **T-002** Git-репозиторий, структура папок `/specs /unity /docs /codesys`
+- [x] **T-001b** TestPLC: `FB_Counter` + `PLC_PRG`, запущен в эмуляторе
+- [x] **T-002** Git-репозиторий, структура папок
 - [x] **T-003** Шаблон spec.md
-- [x] **T-PY-01** Лицензия OPC UA — подтверждена (OPC UA Symbol Publishing Editor + Data Model Editor)
-- [x] **T-PY-02** OPC UA включён; Symbol Configuration добавлен в TestPLC; Python читает теги: `nCount=4`, `bSbros=False`, `nPorog=5` через `asyncua`
-- [x] **T-ARCH-01** Архитектура Python Bridge — спроектирована агентом (ADR-001, C4 L1-L3, протокол, failure modes)
+- [x] **T-PY-01** Лицензия OPC UA подтверждена
+- [x] **T-PY-02** OPC UA включён; Symbol Configuration в TestPLC; Python читает теги
+- [x] **T-ARCH-01** Архитектура Python Bridge — ADR-001, C4 L1-L3, протокол, failure modes
+- [x] **T-PY-03b** Python Bridge OpcUaSource — asyncua polling 200ms, change detection
+- [x] **T-PY-03c** WsServer — broadcast всем Unity клиентам, initial_snapshot
+- [x] **T-PY-03d** WriteDispatcher — whitelist, write_ack
+- [x] **T-PY-04** Unity NativeWebSocket + PLCBridge.cs — counter.count в реальном времени
+- [x] **T-PY-05** End-to-end тест: CODESYS → Python → Unity — счётчик работает ✅
+- [x] **T-DEMO-01** FB_Svetofor в CODESYS: Red/Yellow/Green по таймеру; OPC UA тег `svetofor.state` читается Python Bridge ✅
+- [x] **T-DEMO-02** Unity светофор + кнопки Reset/Stop-Start: TrafficLight.cs, двустороннее управление через WebSocket ✅

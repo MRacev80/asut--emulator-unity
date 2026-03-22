@@ -21,16 +21,19 @@ OPC_BASE = "|var|CODESYS Control Win V3.Application."
 
 # --- Tag registry: friendly_id -> OPC UA node identifier ---
 TAGS = {
-    "counter.count":   OPC_BASE + "PLC_PRG.fbSchyotchik.nCount",
-    "counter.done":    OPC_BASE + "PLC_PRG.fbSchyotchik.bDone",
-    "counter.enable":  OPC_BASE + "PLC_PRG.fbSchyotchik.bEnable",
-    "counter.preset":  OPC_BASE + "PLC_PRG.fbSchyotchik.nPreset",
-    "plc.reset":       OPC_BASE + "PLC_PRG.bSbros",
-    "plc.threshold":   OPC_BASE + "PLC_PRG.nPorog",
+    # Counter
+    "counter.count":    OPC_BASE + "PLC_PRG.fbSchyotchik.nCount",
+    "counter.done":     OPC_BASE + "PLC_PRG.fbSchyotchik.bDone",
+    "counter.enable":   OPC_BASE + "PLC_PRG.fbSchyotchik.bEnable",
+    "counter.preset":   OPC_BASE + "PLC_PRG.fbSchyotchik.nPreset",
+    "plc.reset":        OPC_BASE + "PLC_PRG.bSbros",
+    "plc.threshold":    OPC_BASE + "PLC_PRG.nPorog",
+    # Svetofor
+    "svetofor.state":   OPC_BASE + "PLC_PRG.fbSvetofor.sState",
 }
 
 # Whitelist — only these tags can be written from Unity
-WRITABLE_TAGS = {"counter.enable", "counter.preset", "plc.reset", "plc.threshold"}
+WRITABLE_TAGS = {"plc.reset", "plc.threshold"}
 
 # --- State ---
 ws_clients: set = set()
@@ -107,11 +110,17 @@ async def opc_connect():
     await opc_client.connect()
     log.info("OPC UA connected!")
 
-    # Resolve all tag node IDs
+    # Resolve all tag node IDs — skip tags not in Symbol Configuration
     for tag_id, identifier in TAGS.items():
         node_id = ua.NodeId(Identifier=identifier, NamespaceIndex=OPC_NS,
                             NodeIdType=ua.NodeIdType.String)
-        opc_nodes[tag_id] = opc_client.get_node(node_id)
+        node = opc_client.get_node(node_id)
+        try:
+            await node.read_value()  # Test if node exists
+            opc_nodes[tag_id] = node
+            log.info(f"Tag registered: {tag_id}")
+        except Exception as e:
+            log.warning(f"Tag skipped (not in OPC UA): {tag_id}")
 
     # Read initial values
     for tag_id, node in opc_nodes.items():

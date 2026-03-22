@@ -1,17 +1,26 @@
 # CODESYS
 *.bak
 
-# Unity
-unity/Library/
-unity/Temp/
-unity/Logs/
-unity/obj/
-unity/Build/
-unity/Builds/
-unity/.vs/
-unity/**/*.csproj
-unity/**/*.sln
-unity/**/*.user
+# Unity — generated folders (at any depth under unity/)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Bb]uild/
+[Bb]uilds/
+[Uu]ser[Ss]ettings/
+.vs/
+ExportedObj/
+# Unity generated files
+*.csproj
+*.sln
+*.user
+*.suo
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
 
 # OS
 Thumbs.db
