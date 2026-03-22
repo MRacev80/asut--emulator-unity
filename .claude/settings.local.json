@@ -28,7 +28,22 @@
       "mcp__codesys_local__manage_library",
       "mcp__codesys_local__get_codesys_log",
       "mcp__codesys_local__get_project_variables",
-      "mcp__codesys_local__monitor_variable"
+      "mcp__codesys_local__monitor_variable",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(pip show:*)",
+      "Bash(py --version)",
+      "Bash(py -m pip show asyncua)",
+      "Bash(py -m pip install asyncua)",
+      "Bash(sc query:*)",
+      "Bash(/tmp/opc_browse3.py:*)",
+      "Bash(py /tmp/opc_browse3.py)",
+      "Bash(py /tmp/opc_endpoints.py)",
+      "Bash(powershell -Command \"Restart-Service ''CODESYS Control Win V3'' -Force\")",
+      "Bash(find /c/ProgramData/CODESYS -name *.udb -o -name UserDB* -o -name *user*)",
+      "Bash(py /tmp/opc_resources.py)",
+      "Bash(py /tmp/opc_resources2.py)"
     ]
   }
 }

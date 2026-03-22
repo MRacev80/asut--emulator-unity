@@ -7,19 +7,20 @@
 
 ## В работе
 
-### T-MCP-07 — monitor_variable: запись переменных
+### T-PY-03a — tags.yaml: описать теги TestPLC
 
-**Что:** исправить передачу значения в `set_prepared_value()` как строку (не Python bool/int); перезапустить MCP; протестировать запись BOOL и INT в TestPLC
-**Готово когда:** `monitor_variable` записывает `bStart=TRUE` и `nCount=10` без ошибок; значения подтверждены обратным чтением
-**Зачем:** без записи FAT-автоматизация работает только на чтение — нельзя имитировать входные сигналы
+**Что:** создать `/python-bridge/tags.yaml` — теги TestPLC с реальными node_id из OPC UA
+**Готово когда:** YAML валиден; Python читает node_id и успешно читает значение через asyncua
+**Зачем:** TagRegistry читает tags.yaml — инженер добавляет теги без правки кода Bridge
 
----
-
-### T-PY-02 — Включить OPC UA Server, опубликовать теги TestPLC
-
-**Что:** добавить Symbol Configuration в TestPLC.project; опубликовать `fbSchyotchik`, `bSbros`, `nPorog`; скомпилировать и загрузить в эмулятор; проверить через UaExpert
-**Готово когда:** UaExpert подключается к `opc.tcp://localhost:4840` и показывает минимум 3 тега с живыми значениями
-**Зачем:** без тегов в OPC UA Python Bridge не имеет источника данных
+**Node IDs (уже известны из browse):**
+```
+bSbros:              ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.bSbros
+fbSchyotchik.nCount: ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nCount
+fbSchyotchik.nPreset:ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.nPreset
+fbSchyotchik.bDone:  ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.fbSchyotchik.bDone
+nPorog:              ns=4;s=|var|CODESYS Control Win V3.Application.PLC_PRG.nPorog
+```
 
 ---
 
@@ -28,11 +29,7 @@
 > Архитектура: CODESYS OPC UA Server → Python asyncua → WebSocket → Unity
 > MasterSCADA 4 подключается напрямую к CODESYS OPC UA
 
-### T-PY-03a — tags.yaml: описать теги TestPLC
-
-**Что:** создать `/python-bridge/tags.yaml` — 5 тегов TestPLC: `tag_id`, `node_id` (из UaExpert), `data_type`, `writable`, `unit`, `mock_mode`
-**Готово когда:** YAML валиден; `node_id` скопированы из UaExpert и соответствуют реальным тегам
-**Зачем:** TagRegistry читает tags.yaml — инженер добавляет теги без правки кода Bridge
+### T-PY-03b — Python Bridge: OpcUaSource + MockPlcSource
 
 ---
 
@@ -201,4 +198,5 @@
 - [x] **T-002** Git-репозиторий, структура папок `/specs /unity /docs /codesys`
 - [x] **T-003** Шаблон spec.md
 - [x] **T-PY-01** Лицензия OPC UA — подтверждена (OPC UA Symbol Publishing Editor + Data Model Editor)
+- [x] **T-PY-02** OPC UA включён; Symbol Configuration добавлен в TestPLC; Python читает теги: `nCount=4`, `bSbros=False`, `nPorog=5` через `asyncua`
 - [x] **T-ARCH-01** Архитектура Python Bridge — спроектирована агентом (ADR-001, C4 L1-L3, протокол, failure modes)
