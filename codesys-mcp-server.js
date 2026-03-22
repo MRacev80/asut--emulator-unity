@@ -1540,8 +1540,8 @@ try:
         if hasattr(obj, 'is_pou') and obj.is_pou:
             try:
                 name = obj.get_name()
-                text_doc = obj.get_textual_declaration()
-                if text_doc:
+                text_doc = obj.textual_declaration if hasattr(obj, 'textual_declaration') else None
+                if text_doc and hasattr(text_doc, 'text'):
                     code = text_doc.text
                     results.append("=== %s ===" % name)
                     results.append(code)
@@ -2006,15 +2006,17 @@ try:
     decl = ""
     impl = ""
     try:
-        td = obj.get_textual_declaration()
-        if td: decl = td.text
+        td = obj.textual_declaration if hasattr(obj, 'textual_declaration') else None
+        if td and hasattr(td, 'text'): decl = td.text
+        else: decl = "(no textual_declaration)"
     except Exception as e:
-        decl = "(declaration not available: %s)" % e
+        decl = "(declaration error: %s)" % e
     try:
-        ti = obj.get_textual_implementation()
-        if ti: impl = ti.text
+        ti = obj.textual_implementation if hasattr(obj, 'textual_implementation') else None
+        if ti and hasattr(ti, 'text'): impl = ti.text
+        else: impl = "(no textual_implementation)"
     except Exception as e:
-        impl = "(implementation not available: %s)" % e
+        impl = "(implementation error: %s)" % e
     output = "=== DECLARATION ===\\n%s\\n\\n=== IMPLEMENTATION ===\\n%s" % (decl, impl)
     print("SCRIPT_SUCCESS: " + output)
     sys.exit(0)
@@ -2142,10 +2144,10 @@ try:
     xml_text = ""
     td = None
     try:
-        td = sym_cfg.get_textual_declaration()
-        if td: xml_text = td.text or ""
+        td = sym_cfg.textual_declaration if hasattr(sym_cfg, 'textual_declaration') else None
+        if td and hasattr(td, 'text'): xml_text = td.text or ""
     except Exception as e:
-        print("WARN: get_textual_declaration failed: %s" % e)
+        print("WARN: textual_declaration failed: %s" % e)
     print("DEBUG: current XML length=%d" % len(xml_text))
     print("DEBUG: XML preview: %s" % xml_text[:500])
     added = []
@@ -2266,9 +2268,8 @@ try:
     # Set code if provided
     if GVL_CODE.strip():
         try:
-            td = gvl.get_textual_declaration()
-            if td:
-                td.replace(GVL_CODE)
+            td = gvl.textual_declaration if hasattr(gvl, 'textual_declaration') else None
+            if td: td.replace(GVL_CODE)
         except Exception as ce:
             print("WARN: Could not set GVL code: %s" % ce)
     primary_project.save()
@@ -2360,9 +2361,8 @@ try:
         prefix, suffix = wrappers.get(DUT_TYPE.upper(), ("TYPE %s :\\n" % DUT_NAME, "\\nEND_TYPE"))
         full_code = prefix + DUT_BODY + "\\n" + suffix
         try:
-            td = dut.get_textual_declaration()
-            if td:
-                td.replace(full_code)
+            td = dut.textual_declaration if hasattr(dut, 'textual_declaration') else None
+            if td: td.replace(full_code)
         except Exception as ce:
             print("WARN: Could not set DUT code: %s" % ce)
     primary_project.save()
