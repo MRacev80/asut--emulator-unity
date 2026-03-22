@@ -7,39 +7,7 @@
 
 ## В работе
 
-### T-MCP-10 — update_symbol_configuration: OPC UA теги без UI
-
-**Что:** `update_symbol_configuration` — принимает CSV список путей переменных, добавляет в Symbol Configuration через XML-редактирование textual_declaration
-**Готово когда:** новая переменная появляется в OPC UA без открытия CODESYS UI; Python Bridge её читает
-**Зачем:** каждый новый тег сейчас требует ручного шага в UI — разрывает автоматизацию
-**Статус:** переписан через XML approach (get_textual_declaration → XML edit → replace); ждёт проверки после рестарта Claude Code
-
----
-
-### T-MCP-08 — read_pou_code: чтение ST-кода POU
-
-**Что:** `read_pou_code(pouPath="Application/FB_Counter")` — читает declaration + implementation
-**Готово когда:** возвращает полный ST-код POU
-**Зачем:** Claude читает код вслепую — невозможна инкрементальная разработка
-**Статус:** пофикшен (path resolution через active_application); ждёт проверки после рестарта
-
----
-
-### T-MCP-11 — create_gvl: Global Variable List
-
-**Что:** `create_gvl(name="GVL_HMI", code="VAR_GLOBAL ... END_VAR")` добавляет GVL в проект
-**Готово когда:** GVL виден в списке объектов и компилируется без ошибок
-**Зачем:** реальные проекты используют GVL; без этого всё в PLC_PRG
-**Статус:** пофикшен (resolve_parent через active_application); ждёт проверки после рестарта
-
----
-
-### T-MCP-12 — create_dut: STRUCT/ENUM/UNION
-
-**Что:** `create_dut(name="E_State", dutType="ENUM", body="(Idle, Running, Error)")` добавляет DUT
-**Готово когда:** DUT компилируется и доступен в других POUах
-**Зачем:** FB с логикой состояний требуют ENUM; параметры — STRUCT
-**Статус:** пофикшен (resolve_parent через active_application); ждёт проверки после рестарта
+*(нет активных задач)*
 
 ---
 
@@ -129,6 +97,10 @@
 - [x] **T-PY-05** End-to-end тест: CODESYS → Python → Unity — счётчик работает ✅
 - [x] **T-DEMO-01** FB_Svetofor в CODESYS: Red/Yellow/Green по таймеру; OPC UA тег `svetofor.state` читается Python Bridge ✅
 - [x] **T-DEMO-02** Unity светофор + кнопки Reset/Stop-Start: TrafficLight.cs, двустороннее управление через WebSocket ✅
+- [x] **T-MCP-08** read_pou_code: читает declaration + implementation любого POU ✅
 - [x] **T-MCP-09** get_application_state: возвращает Running/Stopped/Error ✅
+- [x] **T-MCP-11** create_gvl: создаёт Global Variable List с кодом ✅
+- [x] **T-MCP-12** create_dut: создаёт STRUCT/ENUM/UNION ✅
 - [x] **T-MCP-13** list_project_objects: дерево объектов проекта ✅
 - [x] **T-MCP-14** start_stop_application: старт/стоп/сброс без перезагрузки ✅
+- [~] **T-MCP-10** update_symbol_configuration: SP17 не имеет scriptengine API — **workaround: GVL_HMI + wildcard в Symbol Config UI** (один раз вручную)

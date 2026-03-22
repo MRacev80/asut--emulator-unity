@@ -2261,10 +2261,22 @@ def resolve_parent(project, path_str):
 try:
     primary_project = ensure_project_open(PROJECT_FILE_PATH)
     parent = resolve_parent(primary_project, PARENT_PATH)
-    # Create GVL
-    gvl = parent.create_object(scriptengine.ScriptGlobalVariableList, GVL_NAME)
+    # Create GVL — try SP17 API methods in order
+    gvl = None
+    last_err = None
+    for method_name in ['create_gvl', 'create_global_var_list']:
+        m = getattr(parent, method_name, None)
+        if m:
+            try: gvl = m(GVL_NAME); break
+            except Exception as e: last_err = e
+    if gvl is None:
+        # Generic create_object fallback — prints available types if fails
+        try:
+            gvl = parent.create_object(script_engine.ScriptGlobalVariableList, GVL_NAME)
+        except Exception as e:
+            last_err = e
     if not gvl:
-        raise RuntimeError("Failed to create GVL '%s'" % GVL_NAME)
+        raise RuntimeError("Failed to create GVL '%s': %s. parent attrs: %s" % (GVL_NAME, last_err, [a for a in dir(parent) if 'creat' in a.lower()]))
     # Set code if provided
     if GVL_CODE.strip():
         try:
@@ -2341,16 +2353,21 @@ def resolve_parent(project, path_str):
 try:
     primary_project = ensure_project_open(PROJECT_FILE_PATH)
     parent = resolve_parent(primary_project, PARENT_PATH)
-    # Map DUT type string to scriptengine type
-    type_map = {
-        "STRUCT": scriptengine.ScriptDut,
-        "ENUM":   scriptengine.ScriptDut,
-        "UNION":  scriptengine.ScriptDut,
-    }
-    dut_script_type = type_map.get(DUT_TYPE.upper(), scriptengine.ScriptDut)
-    dut = parent.create_object(dut_script_type, DUT_NAME)
+    # Create DUT — try SP17 API methods in order
+    dut = None
+    last_err = None
+    for method_name in ['create_dut', 'create_data_type']:
+        m = getattr(parent, method_name, None)
+        if m:
+            try: dut = m(DUT_NAME); break
+            except Exception as e: last_err = e
+    if dut is None:
+        try:
+            dut = parent.create_object(script_engine.ScriptDut, DUT_NAME)
+        except Exception as e:
+            last_err = e
     if not dut:
-        raise RuntimeError("Failed to create DUT '%s'" % DUT_NAME)
+        raise RuntimeError("Failed to create DUT '%s': %s. parent attrs: %s" % (DUT_NAME, last_err, [a for a in dir(parent) if 'creat' in a.lower()]))
     # Build full DUT code with wrapper
     wrappers = {
         "STRUCT": ("TYPE %s :\\nSTRUCT\\n" % DUT_NAME, "END_STRUCT\\nEND_TYPE"),
