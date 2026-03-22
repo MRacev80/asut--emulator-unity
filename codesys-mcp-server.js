@@ -2198,7 +2198,9 @@ try:
             else:
                 skipped.append(vpath + " (no working API found)")
     primary_project.save()
-    print("SCRIPT_SUCCESS: added=%s skipped=%s" % (added, skipped))
+    sym_attrs = [a for a in dir(sym_cfg) if not a.startswith('_')]
+    xml_preview = xml_text[:200] if xml_text else "(empty)"
+    print("SCRIPT_SUCCESS: added=%s skipped=%s | sym_attrs=%s | xml_preview=%s" % (added, skipped, sym_attrs, xml_preview))
     sys.exit(0)
 except Exception as e:
     print("SCRIPT_ERROR: %s" % traceback.format_exc())
@@ -2221,6 +2223,115 @@ except Exception as e:
                 const success = result.success && result.output.includes("SCRIPT_SUCCESS");
                 const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
                 return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- DIAG: diagnose_symbol_config ---
+        const DIAG_SYMCONFIG_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback, tempfile
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+primary_project = ensure_project_open(PROJECT_FILE_PATH)
+try:
+    # Find application
+    target_app = None
+    try: target_app = primary_project.active_application
+    except Exception: pass
+    if not target_app:
+        lst = primary_project.find("Application", True)
+        if lst: target_app = lst[0]
+    if not target_app:
+        raise RuntimeError("No application found")
+    print("DEBUG: app = %s" % target_app.get_name())
+
+    # Find Symbol Configuration
+    sym_cfg = None
+    for child in target_app.get_children(False):
+        try:
+            n = child.get_name().lower()
+            t = str(type(child)).lower()
+            if 'symbol' in n or 'symbol' in t:
+                sym_cfg = child
+                print("DEBUG: sym_cfg found: name=%s type=%s" % (child.get_name(), type(child)))
+                break
+        except Exception: pass
+    if sym_cfg is None:
+        raise RuntimeError("SymbolConfiguration not found")
+
+    # Full attribute dump
+    all_attrs = [a for a in dir(sym_cfg) if not a.startswith('__')]
+    print("DEBUG: ALL attrs (%d): %s" % (len(all_attrs), all_attrs))
+
+    # Probe export/import methods
+    export_candidates = ['export', 'export_symbol_configuration', 'export_configuration',
+                         'save', 'save_configuration', 'export_symbols', 'serialize',
+                         'to_xml', 'get_xml', 'write_xml']
+    import_candidates = ['import_configuration', 'import_symbol_configuration',
+                         'load', 'load_configuration', 'import_symbols', 'deserialize',
+                         'from_xml', 'read_xml', 'apply_xml']
+    found_export = [m for m in export_candidates if hasattr(sym_cfg, m)]
+    found_import = [m for m in import_candidates if hasattr(sym_cfg, m)]
+    print("DEBUG: found export methods: %s" % found_export)
+    print("DEBUG: found import methods: %s" % found_import)
+
+    # Try textual_declaration text
+    try:
+        td = sym_cfg.textual_declaration if hasattr(sym_cfg, 'textual_declaration') else None
+        if td:
+            print("DEBUG: td type=%s attrs=%s" % (type(td), [a for a in dir(td) if not a.startswith('__')]))
+            if hasattr(td, 'text'):
+                print("DEBUG: td.text = '%s'" % (td.text or "(empty)"))
+        else:
+            print("DEBUG: no textual_declaration")
+    except Exception as e:
+        print("DEBUG: td error: %s" % e)
+
+    # Try scriptengine service discovery
+    svc_candidates = ['ISymbolConfigurationService', 'ISymbolService', 'IExportService',
+                      'IOpcUaProvider', 'ISymbolManager']
+    for svc_name in svc_candidates:
+        try:
+            svc = script_engine.GetService(svc_name)
+            print("DEBUG: service '%s' = %s" % (svc_name, svc))
+        except Exception as e:
+            print("DEBUG: service '%s' -> %s" % (svc_name, e))
+
+    # Try export if any method found
+    if found_export:
+        tmp_path = os.path.join(tempfile.gettempdir(), "codesys_sym_export_test.xml")
+        for m in found_export:
+            try:
+                getattr(sym_cfg, m)(tmp_path)
+                exists = os.path.exists(tmp_path)
+                size = os.path.getsize(tmp_path) if exists else 0
+                print("DEBUG: %s('%s') -> file exists=%s size=%d" % (m, tmp_path, exists, size))
+                if exists and size > 0:
+                    with open(tmp_path, 'r', encoding='utf-8', errors='replace') as f:
+                        print("DEBUG: export preview: %s" % f.read(500))
+            except Exception as e:
+                print("DEBUG: %s() failed: %s" % (m, e))
+
+    print("SCRIPT_SUCCESS: diagnosis complete")
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("diagnose_symbol_config",
+        "Diagnostic: dump all attributes of Symbol Configuration object and probe export/import methods. Use to investigate SP17 API capabilities.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: diagnose_symbol_config`);
+            try {
+                const script = DIAG_SYMCONFIG_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'));
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                return { content: [{ type: "text", text: result.output || "(no output)" }], isError: false };
             }
             catch (e) {
                 return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };

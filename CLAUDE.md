@@ -87,9 +87,10 @@ Claude Code управляет CODESYS через MCP-сервер `codesys_loca
 | `get_application_state` | ✅ | |
 | `list_project_objects` | ✅ | Вывод плоский (без отступов в рендере), но данные верны |
 | `start_stop_application` | ✅ | |
-| `read_pou_code` | ⚠️ | Пофикшен (path через active_application); проверить после рестарта |
-| `create_gvl`, `create_dut` | ⚠️ | Пофикшены; проверить после рестарта |
-| `update_symbol_configuration` | ⚠️ | XML-approach; проверить после рестарта |
+| `read_pou_code` | ✅ | Пофикшен (path через active_application) |
+| `create_gvl`, `create_dut` | ✅ | Пофикшены |
+| `update_symbol_configuration` | ❌ | SP17: `ExtendedObject[IScriptObject]` даёт 0 атрибутов — нет API. Workaround: GVL_HMI + wildcard (см. ниже) |
+| `diagnose_symbol_config` | ✅ | Диагностика sym_cfg объекта — проверка атрибутов и методов |
 
 **После правок server.js — нужен перезапуск Claude Code** (MCP кэширует скрипты в памяти).
 
@@ -111,7 +112,15 @@ Claude пишет код (MCP) → сохраняет файл
 - `simulationMode=True` → загружает во встроенный симулятор CODESYS IDE (OPC UA не видит)
 - Всегда использовать `simulationMode=False` когда нужен OPC UA / Python Bridge / Unity
 
-**Нельзя через MCP:** управление Device, Task Configuration, онлайн-мониторинг, создание GVL.
+**Нельзя через MCP:** управление Device, Task Configuration, онлайн-мониторинг.
+
+**Symbol Configuration (OPC UA теги) — архитектурное решение:**
+SP17 не предоставляет API для программного изменения Symbol Configuration. Объект `Symbols` имеет тип `ExtendedObject[IScriptObject]` с нулевым числом атрибутов.
+
+Workaround — **GVL_HMI + wildcard**:
+1. В CODESYS UI (один раз при создании проекта): Symbol Config → добавить `Application.GVL_HMI.*`
+2. Далее все OPC UA переменные добавлять только через `create_gvl("GVL_HMI")` или `set_pou_code` для GVL_HMI
+3. Wildcard автоматически публикует все переменные GVL_HMI — ничего дополнительно не нужно
 
 ### Расширение server.js
 

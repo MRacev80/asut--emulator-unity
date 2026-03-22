@@ -77,10 +77,24 @@ T-TEST-05 (update_symbol_configuration) — целевой, допускает P
 
 **Итого: 6/8 PASS, 1 PARTIAL, 1 FAIL (архитектурное ограничение SP17)**
 
-**Workaround для update_symbol_configuration:**
-- Разовая настройка в CODESYS UI: добавить `GVL_HMI.*` wildcard в Symbol Config
+**Прогон 3 — 2026-03-22, сессия 3 (diagnose_symbol_config)**
+
+| Инструмент | Статус | Примечание |
+|---|---|---|
+| `diagnose_symbol_config` | ✅ PASS | Диагностика выполнена |
+
+**Финальный вывод по update_symbol_configuration:**
+- `Symbols` объект найден: тип `ExtendedObject[IScriptObject]`
+- `dir(sym_cfg)` → **0 атрибутов** — COM-интерфейс не экспонирован в Python
+- `textual_declaration` → нет
+- Export/import методы → нет ни одного из 20+ кандидатов
+- `script_engine.GetService()` → метод не существует в SP17
+- **Вердикт: SP17 не предоставляет никакого scriptengine API для Symbol Configuration**
+
+**Workaround (принят как архитектурное соглашение):**
+- Разовая настройка в CODESYS UI: добавить `Application.GVL_HMI.*` wildcard в Symbol Config
 - Все новые теги для OPC UA помещать в `GVL_HMI` (создаётся через `create_gvl`)
-- Claude создаёт GVL автоматически → пользователь один раз добавляет wildcard в UI
+- Claude создаёт/обновляет GVL_HMI автоматически через MCP → wildcard публикует всё автоматически
 
 ---
 
