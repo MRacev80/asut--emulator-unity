@@ -77,6 +77,15 @@ public class PLCBridge : MonoBehaviour
                 Tags[update.tag_id] = update.value;
                 OnTagUpdate(update.tag_id, update.value);
             }
+            else if (msg.type == "batch_update")
+            {
+                var batch = JsonUtility.FromJson<BatchUpdateMsg>(json);
+                foreach (var item in batch.updates)
+                {
+                    Tags[item.tag_id] = item.value;
+                    OnTagUpdate(item.tag_id, item.value);
+                }
+            }
             else if (msg.type == "initial_snapshot")
             {
                 Debug.Log("PLCBridge: snapshot received");
@@ -133,8 +142,10 @@ public class PLCBridge : MonoBehaviour
     }
 
     // --- JSON message types ---
-    [Serializable] class WsMessage       { public string type; }
-    [Serializable] class TagUpdateMsg    { public string type; public string tag_id; public string value; public float timestamp; }
-    [Serializable] class PlcStatusMsg    { public string type; public bool connected; public string mode; }
-    [Serializable] class WriteTagMsg     { public string type; public string request_id; public string tag_id; public string value; }
+    [Serializable] class WsMessage        { public string type; }
+    [Serializable] class TagUpdateMsg     { public string type; public string tag_id; public string value; public float timestamp; }
+    [Serializable] class TagUpdateItem    { public string tag_id; public string value; }
+    [Serializable] class BatchUpdateMsg   { public string type; public List<TagUpdateItem> updates; }
+    [Serializable] class PlcStatusMsg     { public string type; public bool connected; public string mode; }
+    [Serializable] class WriteTagMsg      { public string type; public string request_id; public string tag_id; public string value; }
 }

@@ -1,5 +1,10 @@
 # TestPLC — OPC UA tags
 # node_id format: ns=4;s=|var|CODESYS Control Win V3.Application.<path>
+#
+# ВАЖНО: ns=4 — runtime-индекс, назначается CODESYS при старте.
+# Если теги перестали приходить после переустановки CODESYS — проверить:
+#   python -m bridge  → в логах строки "opcua_namespace idx=N uri=..."
+#   Найти idx с uri содержащим "CODESYS" или "Application", подставить в ns=X
 
 tags:
   - tag_id: counter.count

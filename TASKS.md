@@ -90,3 +90,8 @@
 - [~] **T-MCP-10** update_symbol_configuration: SP17 не имеет scriptengine API — **workaround: GVL_HMI + wildcard в Symbol Config UI** (один раз вручную)
 - [x] **T-005** Шаблон спецификации оборудования: `specs/_шаблон/equipment-spec.md` — 11 секций (I/O, состояния, блокировки, аварии, FAT), hints для Claude, YAML профили типов ✅
 - [x] **T-007** stateDiagram + аварийные ситуации — включены в шаблон T-005 (секции 7 и 9) ✅
+- [x] **T-AGENT-01** Claude агент `АСУТП Emulator Engineer` (`~/.claude/agents/asutп-emulator-engineer.md`) — SP17 quirks, MCP таблица, ST/FAT шаблоны ✅
+- [x] **T-SKILL-01** Claude скилл `/asutп-spec` (`asutп-spec/SKILL.md`) — интерактивное заполнение 11-секционного spec.md из описания инженера + генерация ST + FAT ✅
+- [x] **T-ONBOARD-01** `ONBOARDING.md` — 6 шагов от нуля до рабочего окружения, критические правила, структура репозитория ✅
+- [x] **T-SETUP-01** `setup.bat` + `verify.py` — автоматическая настройка окружения (Node.js, MCP-toolkit, патч, .claude.json, Python deps) и проверка стека с таблицей PASS/FAIL ✅
+- [x] **T-TRANSPORT-01** Быстрые правки транспортного уровня — 4 фикса: initial_snapshot chunking (R-WS-1), batch_update вместо N×M отправки (R-ASYNC-1), subscription chunking (R-OPC-1), namespace logging при старте (R-OPC-3). Покрывает 500 тегов без ограничений, снимает риски для 1500. ✅

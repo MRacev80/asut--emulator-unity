@@ -37,6 +37,11 @@ Python Bridge (asyncua + WebSocket)
 
 ---
 
+> **Быстрый путь:** После Шага 1 запустите `setup.bat` — он автоматически выполнит шаги 2–5.
+> Затем `python verify.py` — проверит весь стек и покажет таблицу PASS/FAIL.
+
+---
+
 ## Шаг 2 — Node.js и MCP-сервер
 
 1. Установить **Node.js** LTS: https://nodejs.org
@@ -121,6 +126,8 @@ pip install -r requirements.txt
 
 ## Шаг 6 — Проверочный запуск
 
+> **Быстрая проверка:** `python verify.py` — покажет статус всех компонентов.
+
 ### 6.1 Запустить Control Win V3
 ```
 Пуск → CODESYS Control Win V3 → значок в трее (зелёный)
@@ -190,6 +197,8 @@ asutп-spec/         ← скилл /asutп-spec для Claude
 CLAUDE.md           ← инструкции для Claude (MCP, SP17 quirks)
 TASKS.md            ← текущие задачи
 restore-mcp.bat     ← восстановить патч MCP после npm update
+setup.bat           ← автоматическая настройка окружения (шаги 2-5)
+verify.py           ← проверка всего стека (PASS/FAIL таблица)
 codesys-mcp-server.js ← бэкап патча
 ```
 

@@ -61,6 +61,15 @@ class PlcStatusMsg:
         return json.dumps(asdict(self))
 
 
+@dataclass
+class BatchUpdateMsg:
+    updates: list[dict]   # list of {tag_id, value}
+    type: Literal["batch_update"] = "batch_update"
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self))
+
+
 def parse_message(raw: str) -> WriteTagMsg | None:
     try:
         data = json.loads(raw)

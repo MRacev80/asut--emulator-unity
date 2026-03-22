@@ -14,8 +14,10 @@ import websockets
 from websockets.server import WebSocketServerProtocol
 
 from bridge.ws.protocol import (
-    TagUpdateMsg, InitialSnapshotMsg, WriteAckMsg, PlcStatusMsg, parse_message
+    TagUpdateMsg, InitialSnapshotMsg, BatchUpdateMsg, WriteAckMsg, PlcStatusMsg, parse_message
 )
+
+SNAPSHOT_CHUNK = 200  # max tags per initial_snapshot message (~20KB each)
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +59,8 @@ class WsServer:
         log.info("ws_client_connected clients=%d", len(self._clients))
 
         try:
-            # Send initial snapshot
-            snapshot_msg = InitialSnapshotMsg(
-                tags=[{"tag_id": k, "value": v} for k, v in self._snapshot.items()]
-            )
-            await ws.send(snapshot_msg.to_json())
+            # Send initial snapshot in chunks (avoids >64KB WebSocket buffer limit)
+            await self._send_snapshot(ws)
 
             # Send PLC status
             status_msg = PlcStatusMsg(connected=self._plc_connected, mode=self._mode)
@@ -75,6 +74,19 @@ class WsServer:
             log.info("ws_client_disconnected clients=%d", len(self._clients) - 1)
         finally:
             self._clients.discard(ws)
+
+    async def _send_snapshot(self, ws: WebSocketServerProtocol) -> None:
+        """Send current snapshot in SNAPSHOT_CHUNK-sized pieces to stay under WS buffer limits."""
+        items = list(self._snapshot.items())
+        if not items:
+            await ws.send(InitialSnapshotMsg(tags=[]).to_json())
+            return
+        for i in range(0, len(items), SNAPSHOT_CHUNK):
+            chunk = items[i:i + SNAPSHOT_CHUNK]
+            msg = InitialSnapshotMsg(tags=[{"tag_id": k, "value": v} for k, v in chunk])
+            await ws.send(msg.to_json())
+        log.debug("ws_snapshot_sent tags=%d chunks=%d", len(items),
+                  (len(items) + SNAPSHOT_CHUNK - 1) // SNAPSHOT_CHUNK)
 
     async def _handle_message(self, ws: WebSocketServerProtocol, raw: str) -> None:
         msg = parse_message(raw)
@@ -92,7 +104,7 @@ class WsServer:
         await ws.send(ack.to_json())
 
     async def _batch_loop(self) -> None:
-        """Send accumulated changes every batch_ms."""
+        """Send accumulated changes every batch_ms as one batch_update message per client."""
         while True:
             await asyncio.sleep(self._batch_ms)
             if not self._pending or not self._clients:
@@ -101,16 +113,15 @@ class WsServer:
             batch = self._pending.copy()
             self._pending.clear()
 
-            messages = [
-                TagUpdateMsg(tag_id=k, value=v).to_json()
-                for k, v in batch.items()
-            ]
+            # One message per client (N tags → 1 await) instead of N messages × M clients
+            msg = BatchUpdateMsg(
+                updates=[{"tag_id": k, "value": str(v)} for k, v in batch.items()]
+            ).to_json()
 
             dead = set()
             for ws in self._clients:
                 try:
-                    for msg in messages:
-                        await ws.send(msg)
+                    await ws.send(msg)
                 except Exception:
                     dead.add(ws)
 

@@ -32,6 +32,9 @@ class _SubscriptionHandler:
             self._callback(tag_id, val)
 
 
+SUBSCRIBE_CHUNK = 500  # max monitored items per subscribe_data_change call
+
+
 class OpcUaSource:
     def __init__(
         self,
@@ -74,10 +77,23 @@ class OpcUaSource:
                 node_to_tag[node.nodeid.to_string()] = tag.tag_id
                 nodes.append(node)
 
+            # Log namespace array — helps diagnose ns=X mismatch after reinstall
+            try:
+                ns_array = await client.get_namespace_array()
+                for idx, uri in enumerate(ns_array):
+                    log.info("opcua_namespace idx=%d uri=%s", idx, uri)
+            except Exception as e:
+                log.warning("opcua_namespace_read_failed: %s", e)
+
             handler = _SubscriptionHandler(node_to_tag, self._on_change)
             sub = await client.create_subscription(self._period_ms, handler)
-            await sub.subscribe_data_change(nodes)
-            log.info("opcua_subscribed tags=%d period_ms=%d", len(nodes), self._period_ms)
+
+            # Subscribe in chunks — CODESYS has MaxMonitoredItemsPerSubscription limit
+            for i in range(0, len(nodes), SUBSCRIBE_CHUNK):
+                await sub.subscribe_data_change(nodes[i:i + SUBSCRIBE_CHUNK])
+            log.info("opcua_subscribed tags=%d chunks=%d period_ms=%d",
+                     len(nodes), (len(nodes) + SUBSCRIBE_CHUNK - 1) // SUBSCRIBE_CHUNK,
+                     self._period_ms)
 
             # Keep alive until disconnect
             while self._running:
