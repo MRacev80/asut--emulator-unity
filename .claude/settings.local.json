@@ -43,7 +43,32 @@
       "Bash(powershell -Command \"Restart-Service ''CODESYS Control Win V3'' -Force\")",
       "Bash(find /c/ProgramData/CODESYS -name *.udb -o -name UserDB* -o -name *user*)",
       "Bash(py /tmp/opc_resources.py)",
-      "Bash(py /tmp/opc_resources2.py)"
+      "Bash(py /tmp/opc_resources2.py)",
+      "Bash(py -m pip install websockets pyyaml -q)",
+      "Bash(timeout 8 py -m bridge --mode mock)",
+      "Bash(timeout 10 py __main__.py --mode opcua)",
+      "Bash(pip install:*)",
+      "Bash(py bridge.py)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(py /tmp/opc_poll.py)",
+      "Bash(py /tmp/opc_new_tags.py)",
+      "Read(//c/Users/Mike/Documents/TestPLC/**)",
+      "Bash(mkdir -p /tmp/testplc_extract)",
+      "Bash(cp \"C:/Users/Mike/Documents/TestPLC/TestPLC.project\" /tmp/testplc_extract/TestPLC.project)",
+      "Read(//tmp/**)",
+      "Bash(unzip -o TestPLC.project -d extracted)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/Mike/Documents/проекты/Эмулятор АСУТП Unity/**)",
+      "Bash(done)",
+      "Bash(timeout /t 4 /nobreak)",
+      "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
+      "mcp__codesys_local__get_application_state",
+      "mcp__codesys_local__list_project_objects",
+      "mcp__codesys_local__start_stop_application",
+      "mcp__codesys_local__read_pou_code",
+      "mcp__codesys_local__update_symbol_configuration"
     ]
   }
 }

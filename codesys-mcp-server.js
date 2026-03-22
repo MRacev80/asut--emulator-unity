@@ -1962,21 +1962,42 @@ except Exception as e:
 import sys, scriptengine as script_engine, os, traceback
 ${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
 POU_FULL_PATH = "{POU_FULL_PATH}"
+def find_child(parent, name):
+    try:
+        for child in parent.get_children(False):
+            try:
+                if child.get_name() == name:
+                    return child
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return None
 try:
     primary_project = ensure_project_open(PROJECT_FILE_PATH)
     parts = POU_FULL_PATH.strip("/").split("/")
-    obj = primary_project
-    for part in parts:
-        found = None
-        try:
-            children = obj.get_children(False)
-        except Exception:
-            children = []
-        for child in children:
+    # If path starts with "Application", resolve it via active_application or recursive find
+    if parts and parts[0].lower() == "application":
+        obj = None
+        try: obj = primary_project.active_application
+        except Exception: pass
+        if obj is None:
             try:
-                if child.get_name() == part:
-                    found = child
-                    break
+                found_list = primary_project.find("Application", True)
+                if found_list: obj = found_list[0]
+            except Exception: pass
+        if obj is None:
+            raise RuntimeError("Could not resolve Application in project")
+        parts = parts[1:]
+    else:
+        obj = primary_project
+    for part in parts:
+        found = find_child(obj, part)
+        if found is None:
+            # fallback: recursive search from current node
+            try:
+                found_list = obj.find(part, True)
+                if found_list: found = found_list[0]
             except Exception:
                 pass
         if found is None:
@@ -2085,74 +2106,95 @@ except Exception as e:
 
         // --- T-MCP-10: update_symbol_configuration ---
         const UPDATE_SYMCONFIG_SCRIPT_TEMPLATE = `
-import sys, scriptengine as script_engine, os, traceback
+import sys, scriptengine as script_engine, os, traceback, re
 ${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
 VARIABLES_CSV = """{VARIABLES_CSV}"""
 try:
     primary_project = ensure_project_open(PROJECT_FILE_PATH)
-    target_app = primary_project.active_application
-    if not target_app:
-        for child in primary_project.get_children(True):
-            if hasattr(child, 'is_application') and child.is_application:
-                target_app = child
-                break
+    # Find Application
+    target_app = None
+    try: target_app = primary_project.active_application
+    except Exception: pass
+    if target_app is None:
+        try:
+            lst = primary_project.find("Application", True)
+            if lst: target_app = lst[0]
+        except Exception: pass
     if not target_app:
         raise RuntimeError("No application found in project")
-    # Find or create SymbolConfiguration object
+    # Find SymbolConfiguration (named 'Symbols' in project tree)
     sym_cfg = None
     for child in target_app.get_children(False):
-        type_str = str(type(child)).lower()
-        name_str = str(getattr(child, 'get_name', lambda: '')()).lower()
-        if 'symbol' in type_str or 'symbol' in name_str:
-            sym_cfg = child
-            print("DEBUG: Found SymbolConfiguration: %s" % type(child))
-            break
-    if sym_cfg is None:
-        print("WARN: SymbolConfiguration not found, trying scriptengine approach...")
-        # Try to find via scriptengine typesystem
-        for child in primary_project.get_children(True):
+        try:
+            name_str = child.get_name().lower()
             type_str = str(type(child)).lower()
-            if 'symbol' in type_str:
+            if 'symbol' in name_str or 'symbol' in type_str:
                 sym_cfg = child
-                print("DEBUG: Found SymbolConfiguration (deep): %s" % type(child))
+                print("DEBUG: Found sym_cfg: name=%s type=%s" % (child.get_name(), type(child)))
                 break
+        except Exception: pass
     if sym_cfg is None:
-        raise RuntimeError("SymbolConfiguration object not found. Ensure 'Символьная конфигурация' exists in project tree.")
-    # Parse variable paths
+        raise RuntimeError("SymbolConfiguration not found. Add 'Символьная конфигурация' in CODESYS UI first.")
+    # Parse variable paths to add
     var_paths = [v.strip() for v in VARIABLES_CSV.split(",") if v.strip()]
-    print("DEBUG: Variables to add: %s" % var_paths)
-    # Try to add variables to symbol config
+    print("DEBUG: vars to add: %s" % var_paths)
+    # Read current XML via textual_declaration
+    xml_text = ""
+    td = None
+    try:
+        td = sym_cfg.get_textual_declaration()
+        if td: xml_text = td.text or ""
+    except Exception as e:
+        print("WARN: get_textual_declaration failed: %s" % e)
+    print("DEBUG: current XML length=%d" % len(xml_text))
+    print("DEBUG: XML preview: %s" % xml_text[:500])
     added = []
     skipped = []
-    try:
-        # SP17 API: sym_cfg has add_symbol / symbols collection
-        existing = set()
-        try:
-            for sym in sym_cfg.symbols:
-                existing.add(str(sym.variable_path).strip())
-        except Exception:
-            pass
-        print("DEBUG: Existing symbols count: %d" % len(existing))
+    if td and xml_text.strip():
+        # XML-based approach: add entries via regex/string manipulation
         for vpath in var_paths:
-            if vpath in existing:
-                skipped.append(vpath)
-                print("DEBUG: Already exists: %s" % vpath)
+            # Check if already present (case-insensitive match on variable path)
+            if vpath.lower() in xml_text.lower():
+                skipped.append(vpath + " (already exists)")
+                print("DEBUG: already exists: %s" % vpath)
                 continue
-            try:
-                sym_cfg.add_symbol(vpath)
+            # Build new entry element — try common CODESYS symbol config XML formats
+            # Format 1: <Entry Variable=".App.PLC_PRG.bVar" ... />
+            new_entry = '        <Entry Variable="%s" />' % vpath
+            # Insert before </Entries> or </SymbolConfiguration>
+            if '</Entries>' in xml_text:
+                xml_text = xml_text.replace('</Entries>', new_entry + '\\n        </Entries>')
                 added.append(vpath)
-                print("DEBUG: Added: %s" % vpath)
-            except Exception as add_err:
-                print("DEBUG: add_symbol failed for '%s': %s — trying alternative API" % (vpath, add_err))
-                try:
-                    # Alternative: create_symbol_access or enable existing
-                    sym_cfg.create_access_variable(vpath)
-                    added.append(vpath)
-                    print("DEBUG: Added via create_access_variable: %s" % vpath)
-                except Exception as e2:
-                    skipped.append(vpath + " (ERROR: " + str(e2) + ")")
-    except Exception as api_err:
-        raise RuntimeError("SymbolConfiguration API error: %s\\nAvailable attrs: %s" % (api_err, [a for a in dir(sym_cfg) if not a.startswith('_')]))
+            elif '</SymbolConfiguration>' in xml_text:
+                xml_text = xml_text.replace('</SymbolConfiguration>', '    <Entries>\\n' + new_entry + '\\n    </Entries>\\n</SymbolConfiguration>')
+                added.append(vpath)
+            else:
+                # Append as comment to signal manual action needed
+                skipped.append(vpath + " (XML format unknown, see DEBUG)")
+                print("DEBUG: unknown XML format, cannot add: %s" % vpath)
+        if added:
+            try:
+                td.replace(xml_text)
+                print("DEBUG: XML written back successfully")
+            except Exception as write_err:
+                raise RuntimeError("Failed to write Symbol Configuration XML: %s" % write_err)
+    else:
+        # No XML text — try object API as fallback
+        print("DEBUG: No XML text, trying object API. sym_cfg attrs: %s" % [a for a in dir(sym_cfg) if not a.startswith('_')])
+        for vpath in var_paths:
+            # Try various SP17 methods
+            for method_name in ['add_symbol', 'add_entry', 'insert_symbol', 'create_symbol']:
+                method = getattr(sym_cfg, method_name, None)
+                if method:
+                    try:
+                        method(vpath)
+                        added.append(vpath)
+                        print("DEBUG: Added via %s: %s" % (method_name, vpath))
+                        break
+                    except Exception as me:
+                        print("DEBUG: %s failed: %s" % (method_name, me))
+            else:
+                skipped.append(vpath + " (no working API found)")
     primary_project.save()
     print("SCRIPT_SUCCESS: added=%s skipped=%s" % (added, skipped))
     sys.exit(0)
@@ -2190,11 +2232,18 @@ ${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
 GVL_NAME    = "{GVL_NAME}"
 PARENT_PATH = "{PARENT_PATH}"
 GVL_CODE    = """{GVL_CODE}"""
-try:
-    primary_project = ensure_project_open(PROJECT_FILE_PATH)
-    # Navigate to parent
-    parts = PARENT_PATH.strip("/").split("/") if PARENT_PATH else []
-    parent = primary_project
+def resolve_parent(project, path_str):
+    parts = path_str.strip("/").split("/") if path_str else []
+    parent = project
+    if parts and parts[0].lower() == "application":
+        try: parent = project.active_application
+        except Exception: pass
+        if parent is None:
+            try:
+                lst = project.find("Application", True)
+                if lst: parent = lst[0]
+            except Exception: pass
+        parts = parts[1:]
     for part in parts:
         found = None
         for child in parent.get_children(False):
@@ -2206,6 +2255,10 @@ try:
         if not found:
             raise RuntimeError("Parent not found: '%s'" % part)
         parent = found
+    return parent
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    parent = resolve_parent(primary_project, PARENT_PATH)
     # Create GVL
     gvl = parent.create_object(scriptengine.ScriptGlobalVariableList, GVL_NAME)
     if not gvl:
@@ -2260,10 +2313,18 @@ DUT_NAME    = "{DUT_NAME}"
 DUT_TYPE    = "{DUT_TYPE}"
 PARENT_PATH = "{PARENT_PATH}"
 DUT_BODY    = """{DUT_BODY}"""
-try:
-    primary_project = ensure_project_open(PROJECT_FILE_PATH)
-    parts = PARENT_PATH.strip("/").split("/") if PARENT_PATH else []
-    parent = primary_project
+def resolve_parent(project, path_str):
+    parts = path_str.strip("/").split("/") if path_str else []
+    parent = project
+    if parts and parts[0].lower() == "application":
+        try: parent = project.active_application
+        except Exception: pass
+        if parent is None:
+            try:
+                lst = project.find("Application", True)
+                if lst: parent = lst[0]
+            except Exception: pass
+        parts = parts[1:]
     for part in parts:
         found = None
         for child in parent.get_children(False):
@@ -2275,6 +2336,10 @@ try:
         if not found:
             raise RuntimeError("Parent not found: '%s'" % part)
         parent = found
+    return parent
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    parent = resolve_parent(primary_project, PARENT_PATH)
     # Map DUT type string to scriptengine type
     type_map = {
         "STRUCT": scriptengine.ScriptDut,

@@ -73,6 +73,26 @@ Claude Code управляет CODESYS через MCP-сервер `codesys_loca
 - Кириллица в комментариях → иероглифы в CODESYS SP17 (проблема кодировки UTF-8 vs Windows-1251)
 - `pouPath` формат: `Application/ИмяПОУ` (например `Application/FB_Counter`)
 
+### Статус инструментов (проверено на SP17)
+
+| Инструмент | Статус | Примечание |
+|---|---|---|
+| `open_project`, `create_project`, `save_project` | ✅ | |
+| `create_pou`, `set_pou_code`, `create_method`, `create_property` | ✅ | |
+| `compile_project`, `get_compile_messages` | ✅ | |
+| `download_to_plc` | ✅ | simulationMode=False для OPC UA |
+| `manage_library`, `get_project_variables`, `get_codesys_log` | ✅ | |
+| `monitor_variable` — **write** | ✅ | Работает через set_prepared_value |
+| `monitor_variable` — **read** | ❌ | SP17: read_value падает "Internal Exception" если нет свежего download |
+| `get_application_state` | ✅ | |
+| `list_project_objects` | ✅ | Вывод плоский (без отступов в рендере), но данные верны |
+| `start_stop_application` | ✅ | |
+| `read_pou_code` | ⚠️ | Пофикшен (path через active_application); проверить после рестарта |
+| `create_gvl`, `create_dut` | ⚠️ | Пофикшены; проверить после рестарта |
+| `update_symbol_configuration` | ⚠️ | XML-approach; проверить после рестарта |
+
+**После правок server.js — нужен перезапуск Claude Code** (MCP кэширует скрипты в памяти).
+
 ### Ограничения и рабочий процесс
 
 MCP запускает **отдельный скрытый экземпляр CODESYS** — не подключается к открытому UI.
