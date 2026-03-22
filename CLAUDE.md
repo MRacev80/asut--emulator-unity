@@ -53,8 +53,19 @@ Claude Code управляет CODESYS через MCP-сервер `codesys_loca
 | `create_method` | `projectFilePath`, `pouPath`, `methodName`, `language` | Создать метод FB |
 | `create_property` | `projectFilePath`, `pouPath`, `propertyName` | Создать свойство FB |
 | `compile_project` | `projectFilePath` | Компилировать проект |
-| `manage_library` | `projectFilePath`, `action` (add/remove/list), `libraryName` | Управление библиотеками (**расширение**) |
-| `get_project_variables` | `projectFilePath` | Получить переменные всех ПОУ (**расширение**) |
+| `manage_library` | `projectFilePath`, `action` (add/remove/list), `libraryName` | Управление библиотеками |
+| `get_project_variables` | `projectFilePath` | Declarations всех ПОУ |
+| `get_compile_messages` | `projectFilePath`, `filter` (all/error/warning/info) | Сообщения компилятора |
+| `get_codesys_log` | `logType` (runtime/plc/all), `lines` | Логи runtime |
+| `download_to_plc` | `projectFilePath`, `simulationMode` (false=Control Win V3), `startAfterDownload` | Загрузить в ПЛК |
+| `monitor_variable` | `projectFilePath`, `action` (read/write/read_all), `variablePath`, `value` | Читать/писать переменную online |
+| `read_pou_code` | `projectFilePath`, `pouPath` | **[NEW]** Прочитать declaration + implementation ST-кода |
+| `get_application_state` | `projectFilePath` | **[NEW]** Состояние приложения: Running/Stopped/Error/NoApplication |
+| `update_symbol_configuration` | `projectFilePath`, `variablePaths` (через запятую) | **[NEW]** Добавить теги в OPC UA Symbol Configuration без UI |
+| `create_gvl` | `projectFilePath`, `name`, `parentPath`, `code` | **[NEW]** Создать Global Variable List |
+| `create_dut` | `projectFilePath`, `name`, `dutType` (STRUCT/ENUM/UNION), `parentPath`, `body` | **[NEW]** Создать STRUCT/ENUM/UNION |
+| `list_project_objects` | `projectFilePath` | **[NEW]** Дерево всех объектов проекта (POUs, GVLs, DUTs, папки) |
+| `start_stop_application` | `projectFilePath`, `action` (start/stop/reset) | **[NEW]** Старт/стоп/сброс без перезагрузки |
 
 ### Правила написания ST-кода через Claude
 

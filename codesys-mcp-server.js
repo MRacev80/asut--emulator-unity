@@ -1953,6 +1953,508 @@ except Exception as e:
                 return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
             }
         }));
+        // ═══════════════════════════════════════════════════════════════════
+        // CUSTOM EXTENSIONS — T-MCP-08..14
+        // ═══════════════════════════════════════════════════════════════════
+
+        // --- T-MCP-08: read_pou_code ---
+        const READ_POU_CODE_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+POU_FULL_PATH = "{POU_FULL_PATH}"
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    parts = POU_FULL_PATH.strip("/").split("/")
+    obj = primary_project
+    for part in parts:
+        found = None
+        try:
+            children = obj.get_children(False)
+        except Exception:
+            children = []
+        for child in children:
+            try:
+                if child.get_name() == part:
+                    found = child
+                    break
+            except Exception:
+                pass
+        if found is None:
+            raise RuntimeError("Object not found: '%s' in path '%s'" % (part, POU_FULL_PATH))
+        obj = found
+    decl = ""
+    impl = ""
+    try:
+        td = obj.get_textual_declaration()
+        if td: decl = td.text
+    except Exception as e:
+        decl = "(declaration not available: %s)" % e
+    try:
+        ti = obj.get_textual_implementation()
+        if ti: impl = ti.text
+    except Exception as e:
+        impl = "(implementation not available: %s)" % e
+    output = "=== DECLARATION ===\\n%s\\n\\n=== IMPLEMENTATION ===\\n%s" % (decl, impl)
+    print("SCRIPT_SUCCESS: " + output)
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("read_pou_code",
+        "Read the current ST declaration and implementation code of a specific POU, Method, or Property. Use pouPath like 'Application/FB_Counter'.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            pouPath: zod_1.z.string().describe("Full path to POU/Method/Property, e.g. 'Application/FB_Counter' or 'Application/FB_Counter/Reset'.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, pouPath } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            const sanPouPath = pouPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+            console.error(`Tool call: read_pou_code path=${sanPouPath}`);
+            try {
+                const script = READ_POU_CODE_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'))
+                    .replace("{POU_FULL_PATH}", sanPouPath);
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-09: get_application_state ---
+        const GET_APP_STATE_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback, time
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    target_app = primary_project.active_application
+    if not target_app:
+        for child in primary_project.get_children(True):
+            if hasattr(child, 'is_application') and child.is_application:
+                target_app = child
+                break
+    if not target_app:
+        print("SCRIPT_SUCCESS: state=NoApplication")
+        sys.exit(0)
+    app_name = target_app.get_name()
+    online_app = script_engine.online.create_online_application(target_app)
+    try:
+        online_app.login(script_engine.OnlineChangeOption.Never, False)
+        time.sleep(0.3)
+        state_raw = str(getattr(online_app, 'application_state', 'Unknown'))
+        # Normalize common state strings
+        s = state_raw.lower()
+        if 'run' in s:   state = 'Running'
+        elif 'stop' in s: state = 'Stopped'
+        elif 'exception' in s or 'error' in s: state = 'Error'
+        elif 'no' in s and 'app' in s: state = 'NoApplication'
+        else: state = state_raw
+        print("SCRIPT_SUCCESS: state=%s app=%s raw=%s" % (state, app_name, state_raw))
+        sys.exit(0)
+    finally:
+        try: online_app.logout()
+        except: pass
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("get_application_state",
+        "Get the current runtime state of the CODESYS application (Running/Stopped/Error/NoApplication). Does not modify the application.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: get_application_state path=${absPath}`);
+            try {
+                const script = GET_APP_STATE_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'));
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-10: update_symbol_configuration ---
+        const UPDATE_SYMCONFIG_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+VARIABLES_CSV = """{VARIABLES_CSV}"""
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    target_app = primary_project.active_application
+    if not target_app:
+        for child in primary_project.get_children(True):
+            if hasattr(child, 'is_application') and child.is_application:
+                target_app = child
+                break
+    if not target_app:
+        raise RuntimeError("No application found in project")
+    # Find or create SymbolConfiguration object
+    sym_cfg = None
+    for child in target_app.get_children(False):
+        type_str = str(type(child)).lower()
+        name_str = str(getattr(child, 'get_name', lambda: '')()).lower()
+        if 'symbol' in type_str or 'symbol' in name_str:
+            sym_cfg = child
+            print("DEBUG: Found SymbolConfiguration: %s" % type(child))
+            break
+    if sym_cfg is None:
+        print("WARN: SymbolConfiguration not found, trying scriptengine approach...")
+        # Try to find via scriptengine typesystem
+        for child in primary_project.get_children(True):
+            type_str = str(type(child)).lower()
+            if 'symbol' in type_str:
+                sym_cfg = child
+                print("DEBUG: Found SymbolConfiguration (deep): %s" % type(child))
+                break
+    if sym_cfg is None:
+        raise RuntimeError("SymbolConfiguration object not found. Ensure 'Символьная конфигурация' exists in project tree.")
+    # Parse variable paths
+    var_paths = [v.strip() for v in VARIABLES_CSV.split(",") if v.strip()]
+    print("DEBUG: Variables to add: %s" % var_paths)
+    # Try to add variables to symbol config
+    added = []
+    skipped = []
+    try:
+        # SP17 API: sym_cfg has add_symbol / symbols collection
+        existing = set()
+        try:
+            for sym in sym_cfg.symbols:
+                existing.add(str(sym.variable_path).strip())
+        except Exception:
+            pass
+        print("DEBUG: Existing symbols count: %d" % len(existing))
+        for vpath in var_paths:
+            if vpath in existing:
+                skipped.append(vpath)
+                print("DEBUG: Already exists: %s" % vpath)
+                continue
+            try:
+                sym_cfg.add_symbol(vpath)
+                added.append(vpath)
+                print("DEBUG: Added: %s" % vpath)
+            except Exception as add_err:
+                print("DEBUG: add_symbol failed for '%s': %s — trying alternative API" % (vpath, add_err))
+                try:
+                    # Alternative: create_symbol_access or enable existing
+                    sym_cfg.create_access_variable(vpath)
+                    added.append(vpath)
+                    print("DEBUG: Added via create_access_variable: %s" % vpath)
+                except Exception as e2:
+                    skipped.append(vpath + " (ERROR: " + str(e2) + ")")
+    except Exception as api_err:
+        raise RuntimeError("SymbolConfiguration API error: %s\\nAvailable attrs: %s" % (api_err, [a for a in dir(sym_cfg) if not a.startswith('_')]))
+    primary_project.save()
+    print("SCRIPT_SUCCESS: added=%s skipped=%s" % (added, skipped))
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("update_symbol_configuration",
+        "Add variables to CODESYS Symbol Configuration (OPC UA export) without opening the UI. Pass comma-separated variable paths like '.Application.PLC_PRG.bMyVar'.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            variablePaths: zod_1.z.string().describe("Comma-separated list of variable paths to add to Symbol Configuration, e.g. '.Application.PLC_PRG.bMyVar,.Application.PLC_PRG.nMyInt'.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, variablePaths } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: update_symbol_configuration vars=${variablePaths}`);
+            try {
+                const script = UPDATE_SYMCONFIG_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'))
+                    .replace("{VARIABLES_CSV}", variablePaths);
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-11: create_gvl ---
+        const CREATE_GVL_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+GVL_NAME    = "{GVL_NAME}"
+PARENT_PATH = "{PARENT_PATH}"
+GVL_CODE    = """{GVL_CODE}"""
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    # Navigate to parent
+    parts = PARENT_PATH.strip("/").split("/") if PARENT_PATH else []
+    parent = primary_project
+    for part in parts:
+        found = None
+        for child in parent.get_children(False):
+            try:
+                if child.get_name() == part:
+                    found = child
+                    break
+            except: pass
+        if not found:
+            raise RuntimeError("Parent not found: '%s'" % part)
+        parent = found
+    # Create GVL
+    gvl = parent.create_object(scriptengine.ScriptGlobalVariableList, GVL_NAME)
+    if not gvl:
+        raise RuntimeError("Failed to create GVL '%s'" % GVL_NAME)
+    # Set code if provided
+    if GVL_CODE.strip():
+        try:
+            td = gvl.get_textual_declaration()
+            if td:
+                td.replace(GVL_CODE)
+        except Exception as ce:
+            print("WARN: Could not set GVL code: %s" % ce)
+    primary_project.save()
+    print("SCRIPT_SUCCESS: GVL '%s' created in '%s'" % (GVL_NAME, PARENT_PATH))
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("create_gvl",
+        "Create a Global Variable List (GVL) in a CODESYS project. Optionally set the initial VAR_GLOBAL code.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            name: zod_1.z.string().describe("GVL name, e.g. 'GVL_HMI'."),
+            parentPath: zod_1.z.string().default("Application").describe("Parent path, e.g. 'Application'. Default: Application."),
+            code: zod_1.z.string().optional().describe("Initial VAR_GLOBAL...END_VAR declaration code.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, name, parentPath = "Application", code = "" } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: create_gvl name=${name} parent=${parentPath}`);
+            try {
+                const script = CREATE_GVL_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'))
+                    .replace("{GVL_NAME}", name)
+                    .replace("{PARENT_PATH}", parentPath)
+                    .replace("{GVL_CODE}", code.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"'));
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-12: create_dut ---
+        const CREATE_DUT_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+DUT_NAME    = "{DUT_NAME}"
+DUT_TYPE    = "{DUT_TYPE}"
+PARENT_PATH = "{PARENT_PATH}"
+DUT_BODY    = """{DUT_BODY}"""
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    parts = PARENT_PATH.strip("/").split("/") if PARENT_PATH else []
+    parent = primary_project
+    for part in parts:
+        found = None
+        for child in parent.get_children(False):
+            try:
+                if child.get_name() == part:
+                    found = child
+                    break
+            except: pass
+        if not found:
+            raise RuntimeError("Parent not found: '%s'" % part)
+        parent = found
+    # Map DUT type string to scriptengine type
+    type_map = {
+        "STRUCT": scriptengine.ScriptDut,
+        "ENUM":   scriptengine.ScriptDut,
+        "UNION":  scriptengine.ScriptDut,
+    }
+    dut_script_type = type_map.get(DUT_TYPE.upper(), scriptengine.ScriptDut)
+    dut = parent.create_object(dut_script_type, DUT_NAME)
+    if not dut:
+        raise RuntimeError("Failed to create DUT '%s'" % DUT_NAME)
+    # Build full DUT code with wrapper
+    wrappers = {
+        "STRUCT": ("TYPE %s :\\nSTRUCT\\n" % DUT_NAME, "END_STRUCT\\nEND_TYPE"),
+        "ENUM":   ("TYPE %s :\\n(" % DUT_NAME, ");\\nEND_TYPE"),
+        "UNION":  ("TYPE %s :\\nUNION\\n" % DUT_NAME, "END_UNION\\nEND_TYPE"),
+    }
+    if DUT_BODY.strip():
+        prefix, suffix = wrappers.get(DUT_TYPE.upper(), ("TYPE %s :\\n" % DUT_NAME, "\\nEND_TYPE"))
+        full_code = prefix + DUT_BODY + "\\n" + suffix
+        try:
+            td = dut.get_textual_declaration()
+            if td:
+                td.replace(full_code)
+        except Exception as ce:
+            print("WARN: Could not set DUT code: %s" % ce)
+    primary_project.save()
+    print("SCRIPT_SUCCESS: DUT '%s' (%s) created in '%s'" % (DUT_NAME, DUT_TYPE, PARENT_PATH))
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("create_dut",
+        "Create a Data Unit Type (STRUCT, ENUM, or UNION) in a CODESYS project.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            name: zod_1.z.string().describe("DUT name, e.g. 'E_MotorState' or 'ST_MotorParams'."),
+            dutType: zod_1.z.enum(["STRUCT", "ENUM", "UNION"]).describe("Type: STRUCT, ENUM, or UNION."),
+            parentPath: zod_1.z.string().default("Application").describe("Parent path, e.g. 'Application'. Default: Application."),
+            body: zod_1.z.string().optional().describe("DUT body (without TYPE wrapper), e.g. for ENUM: '(Idle := 0, Running := 1, Error := 2)'. For STRUCT: field declarations.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, name, dutType, parentPath = "Application", body = "" } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: create_dut name=${name} type=${dutType} parent=${parentPath}`);
+            try {
+                const script = CREATE_DUT_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'))
+                    .replace("{DUT_NAME}", name)
+                    .replace("{DUT_TYPE}", dutType)
+                    .replace("{PARENT_PATH}", parentPath)
+                    .replace("{DUT_BODY}", body.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"'));
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-13: list_project_objects ---
+        const LIST_PROJECT_OBJECTS_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+def describe(obj, depth=0):
+    lines = []
+    try:
+        name = obj.get_name()
+    except:
+        name = str(obj)
+    type_str = type(obj).__name__
+    indent = "  " * depth
+    lines.append("%s[%s] %s" % (indent, type_str, name))
+    try:
+        for child in obj.get_children(False):
+            lines.extend(describe(child, depth + 1))
+    except:
+        pass
+    return lines
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    lines = describe(primary_project, 0)
+    output = "\\n".join(lines)
+    print("SCRIPT_SUCCESS:\\n" + output)
+    sys.exit(0)
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("list_project_objects",
+        "List all objects in a CODESYS project as an indented tree (POUs, GVLs, DUTs, folders, tasks, etc.) with their types.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: list_project_objects path=${absPath}`);
+            try {
+                const script = LIST_PROJECT_OBJECTS_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'));
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // --- T-MCP-14: start_stop_application ---
+        const START_STOP_APP_SCRIPT_TEMPLATE = `
+import sys, scriptengine as script_engine, os, traceback, time
+${ENSURE_PROJECT_OPEN_PYTHON_SNIPPET}
+ACTION = "{ACTION}"
+try:
+    primary_project = ensure_project_open(PROJECT_FILE_PATH)
+    target_app = primary_project.active_application
+    if not target_app:
+        for child in primary_project.get_children(True):
+            if hasattr(child, 'is_application') and child.is_application:
+                target_app = child
+                break
+    if not target_app:
+        raise RuntimeError("No application found in project")
+    app_name = target_app.get_name()
+    online_app = script_engine.online.create_online_application(target_app)
+    try:
+        online_app.login(script_engine.OnlineChangeOption.Never, False)
+        time.sleep(0.3)
+        if ACTION == "start":
+            online_app.start()
+            time.sleep(0.5)
+            print("SCRIPT_SUCCESS: Application '%s' started" % app_name)
+        elif ACTION == "stop":
+            online_app.stop()
+            time.sleep(0.5)
+            print("SCRIPT_SUCCESS: Application '%s' stopped" % app_name)
+        elif ACTION == "reset":
+            online_app.reset()
+            time.sleep(0.5)
+            print("SCRIPT_SUCCESS: Application '%s' reset" % app_name)
+        else:
+            raise RuntimeError("Unknown action: '%s'. Use start/stop/reset" % ACTION)
+        sys.exit(0)
+    finally:
+        try: online_app.logout()
+        except: pass
+except Exception as e:
+    print("SCRIPT_ERROR: %s" % traceback.format_exc())
+    sys.exit(1)
+`;
+        server.tool("start_stop_application",
+        "Start, stop, or reset a running CODESYS application without re-downloading. The application must already be loaded on the PLC/runtime.",
+        {
+            projectFilePath: zod_1.z.string().describe("Path to the .project file."),
+            action: zod_1.z.enum(["start", "stop", "reset"]).describe("Action: start — run application, stop — halt execution, reset — reset to initial state.")
+        }, (args) => __awaiter(this, void 0, void 0, function* () {
+            const { projectFilePath, action } = args;
+            const absPath = path.normalize(path.isAbsolute(projectFilePath) ? projectFilePath : path.join(WORKSPACE_DIR, projectFilePath));
+            console.error(`Tool call: start_stop_application action=${action} path=${absPath}`);
+            try {
+                const script = START_STOP_APP_SCRIPT_TEMPLATE
+                    .replace("{PROJECT_FILE_PATH}", absPath.replace(/\\/g, '\\\\'))
+                    .replace("{ACTION}", action);
+                const result = yield (0, codesys_interop_1.executeCodesysScript)(script, codesysExePath, codesysProfileName);
+                const success = result.success && result.output.includes("SCRIPT_SUCCESS");
+                const msg = success ? result.output.split("SCRIPT_SUCCESS:")[1].trim() : `Failed:\n${result.output}`;
+                return { content: [{ type: "text", text: msg }], isError: !success };
+            }
+            catch (e) {
+                return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
+            }
+        }));
+
+        // ═══════════════════════════════════════════════════════════════════
+        // END CUSTOM EXTENSIONS
+        // ═══════════════════════════════════════════════════════════════════
+
         // --- End Tools ---
         console.error("SERVER.TS: Resources and Tools defined.");
         // --- End MCP Resources / Tools Definitions ---

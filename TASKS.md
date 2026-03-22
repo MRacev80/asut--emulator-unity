@@ -11,6 +11,64 @@
 
 ---
 
+## В работе
+
+### T-MCP-08 — read_pou_code: чтение ST-кода POU
+
+**Что:** добавить инструмент `read_pou_code` в server.js — читает declaration + implementation конкретного POU по pouPath
+**Готово когда:** `read_pou_code(pouPath="Application/FB_Counter")` возвращает полный ST-код
+**Зачем:** Claude не может инкрементально дорабатывать код — читает вслепую; это блокирует любую итеративную разработку
+
+---
+
+### T-MCP-09 — get_application_state: состояние приложения
+
+**Что:** добавить `get_application_state` — online login без download, возвращает Running/Stopped/Error/NoApp
+**Готово когда:** корректно возвращает состояние при запущенном и остановленном ПЛК
+**Зачем:** нужен перед `monitor_variable` и `download_to_plc` — иначе неизвестно можно ли писать переменные
+
+---
+
+### T-MCP-10 — update_symbol_configuration: OPC UA теги без UI
+
+**Что:** добавить `update_symbol_configuration` — принимает список путей переменных, добавляет их в Symbol Configuration и пересобирает
+**Готово когда:** новый тег появляется в OPC UA без открытия CODESYS UI
+**Зачем:** каждый новый тег сейчас требует ручного шага в UI — разрывает автоматизацию
+
+---
+
+### T-MCP-11 — create_gvl: Global Variable List
+
+**Что:** добавить `create_gvl` — создаёт GVL с заданным именем и кодом переменных
+**Готово когда:** `create_gvl(name="GVL_HMI", code="VAR_GLOBAL ... END_VAR")` добавляет GVL в проект
+**Зачем:** все реальные проекты используют GVL; сейчас невозможно создать через MCP
+
+---
+
+### T-MCP-12 — create_dut: STRUCT/ENUM/UNION
+
+**Что:** добавить `create_dut` — создаёт DUT (Data Unit Type) с заданным типом и телом
+**Готово когда:** `create_dut(name="E_State", dutType="ENUM", body="(Idle, Running, Error)")` добавляет DUT
+**Зачем:** FB шнека и других объектов требуют STRUCT/ENUM для состояний и параметров
+
+---
+
+### T-MCP-13 — list_project_objects: дерево проекта
+
+**Что:** добавить `list_project_objects` — возвращает иерархическое дерево всех объектов (POU, GVL, DUT, папки) с типами
+**Готово когда:** возвращает имя / тип / путь для всех объектов проекта
+**Зачем:** Claude не может понять структуру чужого проекта без этого инструмента
+
+---
+
+### T-MCP-14 — start_stop_application: управление без перезагрузки
+
+**Что:** добавить `start_stop_application` с action: start/stop/reset — online без download
+**Готово когда:** `start_stop_application(action="stop")` останавливает, `start` запускает
+**Зачем:** `download_to_plc` всегда грузит заново; нужно управление состоянием без перезаписи программы
+
+---
+
 ## Бэклог — Итерация 2 (Python Bridge)
 
 ### T-PY-03a — tags.yaml: описать теги TestPLC
