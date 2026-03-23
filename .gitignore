@@ -29,3 +29,17 @@ desktop.ini
 
 # Obsidian
 .obsidian/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.coverage
+.coverage.*
+python-bridge/tests/coverage_html/
+python-bridge/.pytest_cache/
+*.log
+
+# Claude Code internal (personal settings, memory, agent configs)
+.claude/
