@@ -23,8 +23,12 @@ class MockPlcSource:
         self._interval = interval_ms / 1000.0
         self._callback: ChangeCallback | None = None
         self._running = False
-        self._state: dict[str, Any] = {}
         self._counter = 0
+        # Pre-populate state so read() works before connect()
+        self._state: dict[str, Any] = {
+            tag.tag_id: self._initial_value(tag.data_type)
+            for tag in registry.all()
+        }
 
     def set_callback(self, cb: ChangeCallback) -> None:
         self._callback = cb

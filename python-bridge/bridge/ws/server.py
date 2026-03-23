@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -21,7 +21,7 @@ SNAPSHOT_CHUNK = 200  # max tags per initial_snapshot message (~20KB each)
 
 log = logging.getLogger(__name__)
 
-WriteHandler = Callable[[str, Any], None]  # tag_id, value
+WriteHandler = Callable[[str, Any], Awaitable[bool]]  # tag_id, value → success
 
 
 class WsServer:
@@ -68,7 +68,10 @@ class WsServer:
 
             # Listen for commands from Unity
             async for raw in ws:
-                await self._handle_message(ws, raw)
+                try:
+                    await self._handle_message(ws, raw)
+                except Exception:
+                    log.exception("ws_handle_message_error")
 
         except websockets.ConnectionClosed:
             log.info("ws_client_disconnected clients=%d", len(self._clients) - 1)
@@ -96,8 +99,9 @@ class WsServer:
         log.info("ws_write_request tag=%s value=%s req=%s", msg.tag_id, msg.value, msg.request_id)
 
         if self._write_handler:
-            self._write_handler(msg.tag_id, msg.value)
-            ack = WriteAckMsg(request_id=msg.request_id, tag_id=msg.tag_id, status="ok")
+            success = await self._write_handler(msg.tag_id, msg.value)
+            status = "ok" if success else "denied"
+            ack = WriteAckMsg(request_id=msg.request_id, tag_id=msg.tag_id, status=status)
         else:
             ack = WriteAckMsg(request_id=msg.request_id, tag_id=msg.tag_id,
                               status="error", reason="no write handler")

@@ -39,9 +39,9 @@ async def main(mode: str, tags_yaml: Path, opcua_endpoint: str, ws_port: int) ->
     # Wire up: PLC change → WebSocket broadcast
     source.set_callback(ws.on_tag_change)
 
-    # Wire up: Unity write command → PLC write
-    def write_handler(tag_id: str, value):
-        asyncio.create_task(source.write(tag_id, value))
+    # Wire up: Unity write command → PLC write (returns True/False for ack status)
+    async def write_handler(tag_id: str, value) -> bool:
+        return await source.write(tag_id, value)
 
     ws.set_write_handler(write_handler)
 
